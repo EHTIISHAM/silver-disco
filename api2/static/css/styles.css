@@ -1,0 +1,351 @@
+/* ---------------------------------- */
+/* 1. General Styles and Reset        */
+/* ---------------------------------- */
+body {
+    font-family: 'Inter', Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f7f6;
+    color: #333;
+    line-height: 1.6;
+}
+
+fieldset {
+    margin: 0;
+    padding: 0;
+    border: none;
+    min-width: 0;
+}
+
+/* ---------------------------------- */
+/* 2. Header and Navigation           */
+/* ---------------------------------- */
+header {
+    background-color: #1d4ed8;
+    color: white;
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.header-nav {
+    display: flex;
+    gap: 1rem;
+}
+
+.nav-link {
+    color: white;
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    transition: background-color 0.2s;
+    font-weight: 500;
+}
+
+.nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+.nav-link.active {
+    background-color: rgba(255, 255, 255, 0.25);
+    font-weight: 600;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.welcome-text {
+    font-weight: 500;
+    font-size: 0.95rem;
+}
+
+.logout-btn {
+    color: white;
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border: 1px solid white;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+.logout-btn:hover {
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+/* ---------------------------------- */
+/* 3. Layout Containers               */
+/* ---------------------------------- */
+.content-container {
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+h1 {
+    color: #1e40af;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+h3 {
+    color: #333;
+    margin: 0.5rem 0 1rem 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+h4 {
+    color: #1e40af;
+    margin: 0 0 1rem 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+section {
+    margin-bottom: 2.5rem;
+}
+
+.content-rows {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+.content-column {
+    flex: 1;
+    min-width: 45%;
+    padding: 0;
+}
+
+@media (max-width: 900px) {
+    .content-rows {
+        flex-direction: column;
+    }
+    .content-column {
+        min-width: 100%;
+    }
+}
+
+.flex-heading {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.flex-heading h3 {
+    margin: 0;
+    flex-grow: 1;
+}
+
+.flex-heading span {
+    font-weight: bold;
+    color: #666;
+    font-size: 1.2rem;
+}
+
+.cards-row {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.card {
+    background-color: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e5e7eb;
+    flex: 1 1 100%;
+}
+
+.prizes-table-card {
+    flex: 2;
+    min-width: 60%;
+}
+
+/* ---------------------------------- */
+/* 4. Form Elements                   */
+/* ---------------------------------- */
+.admin-card form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+label {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #4b5563;
+    margin-bottom: 0.5rem;
+}
+
+/* Button Groups for Toggle Buttons */
+.button-group {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.toggle-btn {
+    padding: 0.6rem 1rem;
+    border: 2px solid #d1d5db;
+    border-radius: 6px;
+    background-color: white;
+    color: #4b5563;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.toggle-btn:hover {
+    border-color: #1d4ed8;
+    color: #1d4ed8;
+}
+
+.toggle-btn.active {
+    background-color: #1d4ed8;
+    color: white;
+    border-color: #1d4ed8;
+}
+
+input[type="text"],
+input[type="email"],
+select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    box-sizing: border-box;
+    font-size: 1rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+select:focus {
+    border-color: #1d4ed8;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.2);
+}
+
+/* Buttons */
+button {
+    padding: 0.6rem 1.2rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: white;
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+form[action="/api/games/new"] button[type="submit"] {
+    background-color: #059669;
+}
+
+form[action="/api/games/new"] button[type="submit"]:hover:not(:disabled) {
+    background-color: #047857;
+}
+
+form[action="/api/prizes/new"] button[type="submit"] {
+    background-color: #1d4ed8;
+    margin-top: 0.5rem;
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.delete-btn {
+    background-color: #ef4444;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+}
+
+.delete-btn:hover {
+    background-color: #dc2626;
+}
+
+/* ---------------------------------- */
+/* 5. Tables                          */
+/* ---------------------------------- */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+    background-color: white;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+th, td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 0.95rem;
+}
+
+thead th {
+    background-color: #eef2ff;
+    color: #1d4ed8;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.05em;
+}
+
+tbody tr:nth-child(even) {
+    background-color: #f9fafb;
+}
+
+tbody tr:hover {
+    background-color: #eff6ff;
+}
+
+td:last-child {
+    text-align: center;
+}
+
+/* ---------------------------------- */
+/* 6. Responsive Design               */
+/* ---------------------------------- */
+@media (max-width: 768px) {
+    header {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .header-nav {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .button-group {
+        flex-direction: column;
+    }
+    
+    .toggle-btn {
+        width: 100%;
+    }
+}

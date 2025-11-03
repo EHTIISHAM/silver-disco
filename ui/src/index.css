@@ -1,0 +1,556 @@
+@import url("https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,700;1,400&display=swap");
+
+:root {
+  --primary-light: #f243ff;
+  --dark: #0e0e0e;
+  --primary: #eb33f7;
+  --primary-opacity-1: rgba(250, 232, 0, 10%);
+  --primary-opacity-3: rgba(235, 51, 247, 30%);
+  --secondary: #222222;
+  --tertiary: #eb33f7;
+  --tertiary-opacity-3: rgba(235, 51, 247, 0.3);
+  --quaternary: #57a7e4;
+  --quaternary-opacity-3: rgb(87, 167, 228, 0.3);
+  --5: #e9983d;
+  --5-opacity-3: rgba(233, 152, 61, 0.3);
+  --6: #5fb459;
+  --6-opacity-3: rgba(95, 180, 89, 0.3);
+  --secondary-opacity-1: rgba(57, 58, 102, 10%);
+  --text: #222222;
+  --inverted-text: #f2f2f2;
+  --links: #3d8add;
+  --links-hovered: #2e71b8;
+  --light: #f2f2f2;
+  --pure-light: #ffffff;
+  --pale: #e9f4fb;
+}
+
+* {
+  padding: 0px;
+  margin: 0px;
+  box-sizing: border-box;
+  font-family: "Montserrat", sans-serif;
+  box-sizing: border-box;
+  color: var(--text-color);
+  font-family: "Poppins", sans-serif;
+}
+
+body {
+  background: var(--pure-light);
+}
+
+body > div {
+  width: 100%;
+  min-height: 100vh;
+}
+
+a {
+  text-decoration: none;
+  font-weight: 700;
+  color: var(--links);
+  outline: none;
+}
+
+a:hover {
+  color: var(--links-hovered);
+}
+
+a:focus,
+a:active {
+  color: var(--links-hovered);
+  text-decoration: underline;
+}
+
+.heading {
+  width: 100%;
+  padding: 0.5rem;
+  background: var(--pure-light);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #cccccc;
+}
+
+.heading .logo img {
+  width: 100px;
+}
+
+.heading .nav-links {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 30px;
+}
+
+.heading .nav-links li {
+  list-style: none;
+}
+
+.heading .nav-links li a {
+  color: var(--text);
+  font-weight: normal;
+  text-decoration: none;
+  transition: 0.2s ease-out;
+}
+
+.heading .nav-links .btn-primary {
+  color: var(--inverted-text);
+}
+
+.heading .nav-links .btn-primary:hover {
+  color: var(--inverted-text);
+}
+
+.heading .nav-links li a:hover {
+  color: var(--text);
+}
+
+.heading .nav-links .cta {
+  display: flex;
+  gap: 10px;
+}
+
+.heading .nav-links .userProfile {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
+
+.heading .nav-links .userProfile img {
+  width: 50px;
+}
+
+.heading .nav-links .userProfile .btn-secondary {
+  width: 50px;
+  height: 50px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.btn-primary {
+  padding: 0.5rem 1.25rem;
+  background: var(--primary);
+  color: #000 !important;
+  font-weight: 700 !important;
+  border: none;
+  outline: none;
+  border-radius: 25px;
+  cursor: pointer;
+  transition: 0.1s ease-out;
+}
+
+.btn-primary:focus {
+  background: linear-gradient(120deg, var(--primary-light), var(--primary));
+  box-shadow: 0px 2px 8px 2px var(--quaternary-opacity-3),
+    0px 8px 8px 2px var(--primary-opacity-3);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  padding: 0.5rem 1.25rem;
+  background: var(--dark);
+  color: var(--inverted-text) !important;
+  font-weight: 700 !important;
+  border: none;
+  outline: none;
+  border-radius: 25px;
+  cursor: pointer;
+  transition: 0.1s ease-out;
+}
+
+.btn-secondary:focus {
+  box-shadow: 0 0 0 5px var(--secondary);
+}
+
+.content-container {
+  position: relative;
+  width: 100%;
+  padding: 1rem;
+  margin-top: 2vh;
+  z-index: 5;
+}
+
+.content-container .sign-up-progress-bar {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.content-container .sign-up-progress-bar .sign-up-progress-bar-points {
+  width: 100%;
+  height: 25px;
+  display: flex;
+  align-items: center;
+  background: linear-gradient(to right, var(--primary) 38%, #ffffff 38%);
+}
+
+.content-container .sign-up-progress-bar .sign-up-progress-bar-points .point {
+  width: 50%;
+  padding: 1rem;
+  background: var(--light);
+  position: relative;
+}
+
+.content-container
+  .sign-up-progress-bar
+  .sign-up-progress-bar-points
+  .point
+  > div {
+  width: 50px;
+  height: 50px;
+  position: absolute;
+  top: -25%;
+  left: 0%;
+  background: var(--light);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 5px;
+}
+
+.content-container
+  .sign-up-progress-bar
+  .sign-up-progress-bar-points
+  .point.active {
+  background: var(--primary);
+  font-weight: 700;
+  color: var(--inverted-text);
+}
+
+.content-container
+  .sign-up-progress-bar
+  .sign-up-progress-bar-points
+  .point.active
+  > div {
+  background: var(--primary);
+  color: var(--inverted-text);
+}
+
+.content-container .sign-up-progress-bar .progress-bar-text {
+  width: 100%;
+  display: flex;
+}
+
+.content-container .sign-up-progress-bar .progress-bar-text .point-text {
+  display: block;
+  width: 100%;
+}
+
+.content-container .sign-up-progress-bar .progress-bar-text .active {
+  font-weight: 700;
+}
+
+@media screen and (max-width: 800px) {
+  .content-container .sign-up-progress-bar .sign-up-progress-bar-points {
+    font-size: 12px;
+  }
+
+  .content-container .sign-up-progress-bar .progress-bar-text .point-text {
+    font-size: 16px;
+  }
+}
+
+@media screen and (max-width: 700px) {
+  .content-container .sign-up-progress-bar .sign-up-progress-bar-points {
+    font-size: 16px;
+  }
+
+  .content-container .sign-up-progress-bar .progress-bar-text .point-text {
+    font-size: 8px;
+  }
+
+  .popup {
+    position: absolute;
+    top: 0%;
+    left: 0%;
+    width: 95%;
+    height: 100vh;
+  }
+}
+
+@media screen and (max-width: 360px) {
+  .content-container .sign-up-progress-bar .sign-up-progress-bar-points {
+    font-size: 16px;
+  }
+
+  .content-container .sign-up-progress-bar .progress-bar-text .point-text {
+    font-size: 6px;
+  }
+}
+
+.tiktok-button {
+  background: #ee1d52;
+  border: none;
+  outline: none;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: var(--light);
+  padding: 1rem 2rem;
+  border-radius: 5px;
+  gap: 20px;
+  cursor: pointer;
+  font-weight: 700;
+  transition: 0.1s ease-out;
+}
+
+.tiktok-button:focus {
+  box-shadow: 0 0 0 5px rgba(238, 29, 82, 10%);
+}
+
+.form-control {
+  width: 100%;
+  padding: 1rem;
+  background: var(--pure-light);
+  border: none;
+  outline: none;
+  border-radius: 25px;
+}
+
+.alt {
+  background: var(--light);
+}
+
+.form-control:focus {
+  box-shadow: 0 0 0 5px var(--secondary);
+}
+
+.content-rows {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 30px;
+}
+
+.content-column {
+  width: 100%;
+}
+
+.content-column .flex-heading {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.content-column .cards-row {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 30px;
+  margin-bottom: 30px;
+}
+
+.content-column .cards-row .card {
+  width: 100%;
+  background: var(--light);
+  padding: 1rem;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.content-column .cards-row .admin-card {
+  display: block;
+}
+
+.content-column .cards-row .card img {
+  width: 55px;
+  height: 60px;
+}
+
+.align-right {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media screen and (max-width: 767px) {
+  .content-rows {
+    flex-direction: column;
+  }
+}
+
+.overlay {
+  position: fixed;
+  top: 0%;
+  left: 0%;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.2);
+  z-index: 10;
+}
+
+.popup {
+  height: fit-content;
+  padding: 1rem;
+  background: var(--pure-light);
+  position: absolute;
+  top: 15%;
+  left: 50%;
+  transform: translate(-50%, -15%);
+  border-radius: 10px;
+  box-shadow: 0px 3px 4px rgba(0, 0, 0, 0.2);
+  z-index: 20;
+}
+
+fieldset:disabled {
+  opacity: 0.6;
+}
+
+.table {
+  width: 100%;
+}
+
+.table thead,
+.table tbody {
+  text-align: left;
+}
+
+.game-live-indicator {
+  padding: 10px;
+  background: rgb(244, 23, 78);
+  color: var(--light);
+  font-weight: 700;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 10px;
+}
+
+.mailingList {
+  width: 100%;
+  padding: 2rem;
+  background: var(--pale);
+  border-radius: 5px;
+}
+
+.mailingList input {
+  background: #fff !important;
+}
+
+.mailingList label {
+  font-weight: 700;
+}
+
+.heading .mobile-divider,
+.heading .hamburger,
+.heading .mobile-nav-links {
+  display: none;
+}
+
+@media screen and (max-width: 480px) {
+  .login-heading {
+    display: none;
+  }
+
+  .login-container {
+    text-align: center;
+  }
+
+  .tiktok-button {
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+  }
+
+  .mailingList {
+    text-align: left;
+  }
+
+  .mailingList h3 {
+    text-align: center;
+  }
+
+  .main-btn-primary {
+    width: 100%;
+  }
+
+  .heading {
+    position: relative;
+    z-index: 1000;
+  }
+
+  .heading .hamburger {
+    display: block;
+    padding: 1rem;
+  }
+
+  .heading .mobile-divider {
+    display: block;
+    width: 15%;
+  }
+
+  .heading .nav-links {
+    display: none;
+  }
+
+  .heading .mobile-nav-links {
+    background: rgba(255, 255, 255, 80%) !important;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    position: absolute;
+    top: 100%;
+    left: 0%;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    z-index: 10000;
+    padding: 1rem;
+    border: 1px solid #cccccc;
+  }
+
+  .next-game-column {
+    background: var(--pale);
+    padding: 1rem;
+    border-radius: 10px;
+  }
+
+  .next-game-column .card {
+    background: var(--pure-light) !important;
+  }
+}
+
+.ball-images {
+  width: 40px !important;
+  height: 40px !important;
+}
+
+.gameNumber {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.winning-balls {
+  display: flex;
+  gap: 2px;
+  border: 1px solid #ccc;
+  width: 160px;
+  border-radius: 25px;
+  overflow-x: auto;
+}
+
+.winning-balls .first {
+  border: 5px solid var(--5);
+  border-radius: 50%;
+  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+
+
+
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

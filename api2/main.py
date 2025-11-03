@@ -1,0 +1,335 @@
+# THIS APP WILL HANDLE ADMIN PROFILE REQUESTS 
+# FROM DASHBOARD ADMIN CAN LOGIN THROUGHT THIS API VERIFICATION WILL BE DONE
+# RAW PASSWORD WILL BE STORED ALONGSIDE THE NAME AND HASH TOKEN IN ENV FILE
+# HASED PASSWORD WILL BE USED FOR VERIFICATION PURPOSES
+# THE DASHBOARD DATA WILL BE FETCHED FROM THIS API ONLY
+# SENT TO THE ALREADY EXISTING PINBALLRACE_COM MONGO DB DATABASE
+# IT WILL HANDLE GAMES/PRIZES/PLAYERS DATA FORM DASHBOARD
+
+# main.py
+import os
+import uuid
+import base64
+import asyncio
+from datetime import datetime, timedelta, timezone
+from typing import Optional, List, Dict, Any
+
+from fastapi import FastAPI, Request, Form, Response, HTTPException, status
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
+from motor.motor_asyncio import AsyncIOMotorClient
+from passlib.hash import bcrypt
+from pydantic import BaseModel
+from dotenv import load_dotenv
+
+load_dotenv()
+
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+DB_NAME = os.getenv("DB_NAME", "pinballrace_com")
+SECRET_KEY = os.getenv("SECRET_KEY", "supersecret")
+SESSION_EXPIRE_SECONDS = int(os.getenv("SESSION_EXPIRE_SECONDS", "86400"))
+
+app = FastAPI()
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+
+templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Mongo client
+mongo = AsyncIOMotorClient(MONGO_URI)
+db = mongo[DB_NAME]
+
+# ---------- Utilities ----------
+async def get_next_sequence(name: str) -> int:
+    """Auto-increment counter for gameNumber etc."""
+    r = await db.counters.find_one_and_update(
+        {"_id": name},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=True,
+    )
+    return r["seq"]
+
+def hash_password(plain: str) -> str:
+    return bcrypt.hash(plain)
+
+def verify_password(plain: str, hashed: str) -> bool:
+    try:
+        return bcrypt.verify(plain, hashed)
+    except Exception:
+        return False
+
+async def create_session(username: str) -> str:
+    sid = base64.urlsafe_b64encode(uuid.uuid4().bytes).decode().rstrip("=")
+    expires_at = datetime.utcnow() + timedelta(seconds=SESSION_EXPIRE_SECONDS)
+    await db.sessions.insert_one({
+        "_id": sid,
+        "username": username,
+        "created_at": datetime.utcnow(),
+        "expires_at": expires_at
+    })
+    return sid
+
+async def get_session(sid: str):
+    if not sid: 
+        return None
+    s = await db.sessions.find_one({"_id": sid})
+    if not s:
+        return None
+    if s.get("expires_at") and s["expires_at"] < datetime.utcnow():
+        await db.sessions.delete_one({"_id": sid})
+        return None
+    return s
+
+async def require_login(request: Request):
+    sid = request.cookies.get("session_id")
+    session = await get_session(sid)
+    if not session:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return session["username"]
+
+def format_timestamp(timestamp: int) -> str:
+    """Convert millisecond timestamp to readable date string"""
+    try:
+        dt = datetime.fromtimestamp(timestamp / 1000.0)
+        return dt.strftime('%Y-%m-%d %H:%M:%S')
+    except:
+        return 'N/A'
+
+# ---------- Models ----------
+class GameModel(BaseModel):
+    gameType: str
+    numberOfBalls: int = 12
+    bonusBalls: Optional[int] = 0
+    starttimeofgame: int
+    prizeId: str
+    timerPerRace: str
+    timerTillNextGame: str
+    participants: List = []
+    attempters: List = []
+    winners: List = []
+    status: str = "Not Started"
+    gameNumber: int
+    createdAt: int = int(datetime.now(timezone.utc).timestamp()*1000)
+    endedAt: int
+
+
+# ---------- Auth endpoints ----------
+@app.get("/login", response_class=HTMLResponse)
+async def login_form(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request, "error": None})
+
+@app.post("/login")
+async def login(request: Request, response: Response, username: str = Form(...), password: str = Form(...)):
+    # Admin user stored in collection 'admins'
+    admin = await db.admins.find_one({"username": username})
+    if admin and "password_hash" in admin:
+        if verify_password(password, admin["password_hash"]):
+            sid = await create_session(username)
+            resp = RedirectResponse(url="/dashboard", status_code=302)
+            resp.set_cookie("session_id", sid, httponly=True, secure=False, samesite="lax")  # secure=True when using HTTPS via nginx
+            return resp
+        else:
+            return templates.TemplateResponse("login.html", {"request": request, "error": "Invalid credentials"})
+    else:
+        # Optionally allow first-run create admin if env provided
+        env_admin = os.getenv("ADMIN_USERNAME")
+        env_pass = os.getenv("ADMIN_PASSWORD")
+        env_hash = os.getenv("ADMIN_PASSWORD_HASH")
+        if env_admin and username == env_admin and (env_pass or env_hash):
+            if env_hash:
+                pwok = verify_password(password, env_hash)
+            else:
+                pwok = password == env_pass
+            if pwok:
+                # create persistent admin doc
+                password_hash = env_hash if env_hash else hash_password(password)
+                await db.admins.update_one({"username": username}, {"$set": {"username": username, "password_hash": password_hash}}, upsert=True)
+                sid = await create_session(username)
+                resp = RedirectResponse(url="/dashboard", status_code=302)
+                resp.set_cookie("session_id", sid, httponly=True, secure=False, samesite="lax")
+                return resp
+        return templates.TemplateResponse("login.html", {"request": request, "error": "Invalid credentials"})
+
+@app.get("/logout")
+async def logout(request: Request):
+    sid = request.cookies.get("session_id")
+    if sid:
+        await db.sessions.delete_one({"_id": sid})
+    resp = RedirectResponse(url="/login", status_code=302)
+    resp.delete_cookie("session_id")
+    return resp
+
+# ---------- Dashboard & templates ----------
+@app.get("/", include_in_schema=False)
+async def root():
+    return RedirectResponse("/login")
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request):
+    try:
+        username = await require_login(request)
+    except HTTPException:
+        return RedirectResponse("/login")
+    
+    prizes = await db.prizes.find().to_list(length=1000)
+    next_game = await db.games.find_one({"status": "Not Started"}, sort=[("createdAt", 1)])
+    
+    context = {
+        "request": request,
+        "username": username,
+        "prizes": prizes,
+        "nextGame": next_game,
+    }
+    return templates.TemplateResponse("dashboard.html", context)
+
+@app.get("/past-winners", response_class=HTMLResponse)
+async def past_winners_page(request: Request):
+    try:
+        username = await require_login(request)
+    except HTTPException:
+        return RedirectResponse("/login")
+    
+    # Fetch past winners from pastWinners collection
+    winners_cursor = db.pastWinners.find().sort("createdAt", -1).limit(500)
+    past_winners = await winners_cursor.to_list(length=500)
+    
+    # Format the timestamps for display
+    for winner in past_winners:
+        winner['createdAt_formatted'] = format_timestamp(winner.get('createdAt', 0))
+    
+    context = {
+        "request": request,
+        "username": username,
+        "pastWinners": past_winners,
+    }
+    return templates.TemplateResponse("past_winners.html", context)
+
+# ---------- API endpoints to mirror your React functions ----------
+@app.post("/api/games/new")
+async def api_new_game(
+    request: Request,
+    gameType: str = Form(...),
+    timerTillNextGame: str = Form(...),
+    prize: str = Form(...)
+):
+    await require_login(request)
+    
+    if not prize or prize == "Select":
+        raise HTTPException(400, "Please select a prize")
+    
+    game_number = await get_next_sequence("gameNumber")
+    
+    # Convert timer to minutes for storage
+    timer_minutes = int(timerTillNextGame)
+    
+    game_doc = {
+        "status": "Not Started",
+        "gameType": gameType,
+        "gameNumber": game_number,
+        "numberOfBalls": 12,
+        "bonusBalls": 0,
+        "prizeId": prize,
+        "timerTillNextGame": timer_minutes,
+        "participants": [],
+        "kicked": [],
+        "attempters": [],
+        "winners": [],
+        "createdAt": int(datetime.utcnow().timestamp() * 1000)
+    }
+    
+    await db.games.insert_one(game_doc)
+    return RedirectResponse("/dashboard", status_code=303)
+
+
+@app.post("/api/games/begin")
+async def api_begin_races(request: Request):
+    await require_login(request)
+    # find next game and set it ongoing
+    next_game = await db.games.find_one({"status": "Not Started"}, sort=[("createdAt", 1)])
+    if not next_game:
+        raise HTTPException(400, "No next game ready")
+    await db.games.update_one({"_id": next_game["_id"]}, {"$set": {"status": "Ongoing", "startedAt": int(datetime.utcnow().timestamp()*1000)}})
+    # optionally create initial race document
+    await db.races.insert_one({"gameId": next_game["_id"], "raceNumber": 1, "winners": [], "createdAt": int(datetime.utcnow().timestamp()*1000)})
+    return RedirectResponse("/dashboard", status_code=303)
+
+@app.post("/api/games/update")
+async def api_update_current_game(request: Request,
+                                  winners: Optional[str] = Form(""),
+                                  raceWinners: Optional[str] = Form(""),
+                                  kick_ids: Optional[str] = Form(""),
+                                  add_ids: Optional[str] = Form(""),
+                                  game_id: str = Form("")):
+    await require_login(request)
+    # parse logic similar to your React handlers
+    update_ops = {}
+    if winners:
+        arr = [s.strip() for s in winners.split(",") if s.strip()]
+        update_ops["winners"] = arr
+        update_ops["status"] = "Finished"
+        update_ops["endedAt"] = int(datetime.utcnow().timestamp()*1000)
+    if raceWinners:
+        arr = [s.strip() for s in raceWinners.split(",") if s.strip()]
+        update_ops["raceWinners"] = arr
+
+    if kick_ids:
+        arr = [s.strip() for s in kick_ids.split(",") if s.strip()]
+        await db.games.update_one(
+            {"_id": game_id},
+            {"$pull": {"participants": {"participantId": {"$in": arr}}}}
+        )
+
+    if add_ids:
+        arr = [s.strip() for s in add_ids.split(",") if s.strip()]
+        new_players = [{"participantId": a, "participantName": a, "ball": None} for a in arr]
+        await db.games.update_one(
+            {"_id": game_id},
+            {"$push": {"participants": {"$each": new_players}}}
+        )
+
+    if update_ops:
+        await db.games.update_one({"_id": game_id}, {"$set": update_ops})
+
+    return RedirectResponse("/dashboard", status_code=303)
+
+@app.post("/api/prizes/new")
+async def api_new_prize(request: Request, title: str = Form(...), description: str = Form("")):
+    await require_login(request)
+    await db.prizes.insert_one({
+        "title": title,
+        "description": description,
+        "createdAt": datetime.utcnow()
+    })
+    return RedirectResponse("/dashboard", status_code=303)
+@app.get("/api/users/all")
+async def api_get_all_users(request: Request):
+    await require_login(request)
+    users = await db.users.find({}, {"_id": 1, "username": 1, "email": 1}).to_list(length=500)
+    return [
+        {"id": str(u["_id"]), "name": u.get("username", "Unknown"), "email": u.get("email", "")}
+        for u in users
+    ]
+
+@app.post("/api/prizes/delete")
+async def api_delete_prize(request: Request, prize_id: str = Form(...)):
+    await require_login(request)
+    await db.prizes.delete_one({"_id": prize_id})
+    return RedirectResponse("/dashboard", status_code=303)
+
+# Add more endpoints as needed (past winners listing, deleting games, etc.)
+
+# ---------- Startup: ensure counters exist ----------
+@app.on_event("startup")
+async def startup_event():
+    env_admin = os.getenv("ADMIN_USERNAME")
+    env_pass = os.getenv("ADMIN_PASSWORD")
+    env_hash = os.getenv("ADMIN_PASSWORD_HASH")
+    if env_admin and (env_pass or env_hash):
+        existing = await db.admins.find_one({"username": env_admin})
+        if not existing:
+            pw = env_hash if env_hash else hash_password(env_pass)
+            await db.admins.insert_one({"username": env_admin, "password_hash": pw})
+    await db.counters.update_one({"_id": "gameNumber"}, {"$setOnInsert": {"seq": 0}}, upsert=True)

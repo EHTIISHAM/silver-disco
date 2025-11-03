@@ -1,0 +1,65 @@
+<!-- templates/past_winners.html -->
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Past Winners - Admin Dashboard</title>
+  <link rel="stylesheet" href="/static/css/styles.css" />
+</head>
+<body>
+  <header>
+    <span class="welcome-text">Welcome, {{ username }}</span>
+    <div class="header-nav">
+      <a href="/dashboard" class="nav-link">Dashboard</a>
+      <a href="/past-winners" class="nav-link active">Past Winners</a>
+    </div>
+    <div class="header-right">
+      <a href="/logout" class="logout-btn">Logout</a>
+    </div>
+  </header>
+
+  <main class="content-container">
+    <h1>Past Winners</h1>
+
+    <section>
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Username</th>
+              <th>Email</th>
+              <th>Prize</th>
+              <th>Game ID</th>
+              <th>Game Type</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if pastWinners %}
+              {% for w in pastWinners %}
+                <tr>
+                  <td>{{ loop.index }}</td>
+                  <td>{{ w.username }}</td>
+                  <td>{{ w.email }}</td>
+                  <td>{{ w.prize }}</td>
+                  <td>{{ w.gameId }}</td>
+                  <td>{{ w.gameType if w.gameType else 'N/A' }}</td>
+                  <td>{{ w.createdAt_formatted }}</td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="7" style="text-align: center; color: #6b7280; padding: 2rem;">
+                  No past winners yet
+                </td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+</body>
+</html>
