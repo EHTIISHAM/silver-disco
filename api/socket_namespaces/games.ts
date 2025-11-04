@@ -462,6 +462,17 @@ export default function (io: Namespace) {
             if (user) {
               updateAdmin(socket);
 
+              // socket.on("newPrize", async (data) => {
+              //   if ("title" in data && "description" in data) {
+              //     const prize = await Prize.create({
+              //       title: data.title,
+              //       description: data.description,
+              //       image: "nofile.png",
+              //     });
+
+              //     socket.emit("newPrizeId", prize._id.toString());
+              //   }
+              // });
               socket.on("newPrize", async (data) => {
                 if ("title" in data && "description" in data) {
                   const prize = await Prize.create({
@@ -470,9 +481,14 @@ export default function (io: Namespace) {
                     image: "nofile.png",
                   });
 
+                  // Step 1 — send prize ID back for image upload
                   socket.emit("newPrizeId", prize._id.toString());
+
+                  // Step 2 — update admin dashboard for everyone
+                  updateAdmin(socket);
                 }
               });
+
 
               socket.on("newGame", async (data) => {
                 if ("type" in data && "timer" in data && "prize" in data) {

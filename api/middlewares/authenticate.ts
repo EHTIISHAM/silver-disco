@@ -14,9 +14,9 @@ export default async function authenticate(
     if (userVerified) {
       next();
     } else {
-      next("User not authenticated. Not verified.");
+      next("User not authenticated.");
     }
   } else {
-    next("User not authenticated. No token found.");
+    next("User not authenticated.");
   }
 }

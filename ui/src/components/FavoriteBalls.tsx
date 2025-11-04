@@ -1,10 +1,10 @@
 import React from "react";
 
-import Ball1 from "../assets/balls/1.png";
-import Ball2 from "../assets/balls/2.png";
-import Ball3 from "../assets/balls/3.png";
-import Ball4 from "../assets/balls/4.png";
-import Ball5 from "../assets/balls/5.png";
+import Ball1 from "../assets/5balls/1.svg";
+import Ball2 from "../assets/5balls/2.svg";
+import Ball3 from "../assets/5balls/3.svg";
+import Ball4 from "../assets/5balls/4.svg";
+import Ball5 from "../assets/5balls/5.svg";
 import Ball6 from "../assets/balls/6.png";
 import Ball7 from "../assets/balls/7.png";
 import Ball8 from "../assets/balls/8.png";
@@ -46,12 +46,16 @@ const FavoriteBalls: React.FC = () => {
         {favoriteBalls.map((number) => (
           <div
             key={number}
-            className={`w-12 h-12 rounded-full overflow-hidden flex items-center justify-center ${ballColors[number]}`}
+            className={`w-6 h-6 rounded-full flex items-center justify-center ${ballColors[number]}`}
           >
             <img
               src={importedBalls[number - 1]}
-              alt={`Ball number ${number}`}
-              className="w-full h-full object-cover"
+    className="w-full h-full object-contain select-none"
+    style={{
+      imageRendering: "auto",
+      WebkitMaskImage: "radial-gradient(circle, white 99%, transparent 100%)",
+      maskImage: "radial-gradient(circle, white 99%, transparent 100%)",
+    }}  
             />
           </div>
         ))}

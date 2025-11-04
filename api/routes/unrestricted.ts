@@ -15,9 +15,11 @@ import leaderboardRoutes from "./leaderboardRoutes";
 import { gameWebhook } from "../controllers/unrestricted/gameWebhook";
 import { getUserStats } from "../controllers/unrestricted/userStats";
 import { getTiktokStatus } from "../controllers/unrestricted/getTiktokStatus";
+import { getGames } from "../controllers/unrestricted/getGames";
 
 const unrestricted = express.Router();
 
+unrestricted.get("/games", getGames);
 unrestricted.get("/stats/:userId", getUserStats);
 unrestricted.get("/tiktok-status", getTiktokStatus);
 

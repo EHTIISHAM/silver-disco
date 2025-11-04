@@ -1,11 +1,35 @@
-import basicAuth from 'express-basic-auth';
+import { Request, Response, NextFunction } from "express";
+import verifyJwt from "../helpers/auth/verifyJwt";
+import { decode } from "jsonwebtoken";
+import User from "../models/User";
 
+export default async function authenticateAdmin(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  let token: string = req.cookies.adminToken;
 
-const ADMIN_USERNAME = 'admin';
-const ADMIN_PASSWORD = '12341234';
+  if (token) {
+    let userVerified = await verifyJwt(token);
 
-export const adminAuthMiddleware = basicAuth({
-    users: { [ADMIN_USERNAME]: ADMIN_PASSWORD },
-    challenge: true, 
-    unauthorizedResponse: 'Unauthorized access to the admin dashboard.',
-});
+    if (userVerified) {
+      const userId = await decode(token);
+
+      const user = await User.findOne({
+        _id: userId,
+        userType: "Admin",
+      });
+
+      if (user) {
+        next();
+      } else {
+        next("User not authenticated.");
+      }
+    } else {
+      next("User not authenticated.");
+    }
+  } else {
+    next("User not authenticated.");
+  }
+}

@@ -10,23 +10,29 @@ import AccountScreen from "../../../components/account";
 type ActiveTab = "Home" | "Winners" | "Data" | "Profile";
 
 const PinballRaceHome: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<ActiveTab>("Home");
+  // ✅ Load saved tab from localStorage, or default to "Home"
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
+    const savedTab = localStorage.getItem("activeTab") as ActiveTab | null;
+    return savedTab || "Home";
+  });
 
   // ✅ User state for header props
   const [user, setUser] = useState<{ username?: string; pfp?: string }>({});
 
   const handleTabChange = (tab: ActiveTab) => {
     setActiveTab(tab);
+    localStorage.setItem("activeTab", tab); // ✅ Save tab choice
     console.log(`Navigation changed to: ${tab}`);
   };
 
-  // ✅ Fetch user info once (just like your old working setup)
+  // ✅ Fetch user info once
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const serverUrl = import.meta.env.VITE_SERVER_URL || "http://localhost:3000";
+        const serverUrl =
+          import.meta.env.VITE_SERVER_URL || "http://localhost:3000";
         const res = await fetch(`${serverUrl}/get_profile`, {
-          credentials: "include", // include token cookie
+          credentials: "include",
         });
 
         if (!res.ok) {
@@ -51,17 +57,12 @@ const PinballRaceHome: React.FC = () => {
 
   return (
     <div className="bg-black min-h-screen text-white pb-24 flex flex-col">
-      {/* ✅ Pass user props to header */}
       <PinballRaceHeader username={user.username} pfp={user.pfp} />
 
       <main className="flex-1 p-4 space-y-6">
         {activeTab === "Home" && (
           <>
-            <LiveStreamCard/>
-              
-            
-
-
+            <LiveStreamCard />
             <RaceDashboard />
           </>
         )}
@@ -76,10 +77,5 @@ const PinballRaceHome: React.FC = () => {
 };
 
 export default PinballRaceHome;
-
-
-
-
-
 
 

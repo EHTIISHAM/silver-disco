@@ -39,61 +39,76 @@ const JoinRaceModal: React.FC<JoinRaceModalProps> = ({ onClose }) => {
     <div className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm z-50">
       <div className="bg-[#1a1a1a] w-[90%] sm:w-[420px] rounded-2xl shadow-xl overflow-hidden border border-gray-800">
         {/* Header */}
-        <div className="flex justify-between items-center p-4 border-b border-gray-800">
+        <div className="flex justify-between items-center p-4 border-b border-gray-800 bg-[#1a1a1a]">
           <div>
             <h2 className="text-white font-semibold text-lg">Join race</h2>
             <p className="text-gray-400 text-xs">
               Select one ball (1–15) for race{" "}
-              <span className="text-indigo-400">#18092501</span>.
+              18092501
               Entry closes 30 seconds before start time.
             </p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition">
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-white transition"
+          >
             <X size={18} />
           </button>
         </div>
-
+        <div>
         {/* Game Type */}
-        <div className="p-4">
-          <div className="mb-3">
-            <h3 className="text-White-300 text-sm mb-1">Game type</h3>
-            <p className="text-gray-400 text-sm">
-              Type chosen for your game is:{" "}
-              <span className="text-indigo-400 font-medium">Eliminator</span>
-            </p>
-          </div>
+        <div className="p-4 bg-[#1f1f1f] flex items-center justify-between">
+        {/* Left side */}
+        <div className="flex flex-col">
+          <h3 className="text-white-400 text-sm mb-1">Game type</h3>
+          <p className="text-gray-400 text-sm">Type chosen for your game is:</p>
+        </div>
+
+        {/* Right side */}
+        <div className="flex items-center">
+          <span className="text-indigo-400 font-semibold text-base">Eliminator</span>
+        </div>
+        </div>
+ 
+
 
           {/* Ball Grid */}
-          <div className="grid grid-cols-5 gap-3 justify-items-center">
+          <div className="grid grid-cols-5 gap-3 justify-items-center bg-[#1f1f1f] p-2 rounded-lg">
             {balls.map((ball) => (
               <div
                 key={ball.id}
                 onClick={() => setSelectedBall(ball.id)}
                 className={`rounded-xl overflow-hidden cursor-pointer border-2 transition 
-                  ${selectedBall === ball.id ? "border-indigo-500" : "border-transparent"}`}
+                  ${selectedBall === ball.id
+                    ? "border-white-500"
+                    : "border-transparent"
+                  }`}
               >
                 <img
-                  src={ball.img}
-                  alt={`Ball ${ball.id}`}
-                  className="object-cover w-16 h-16 sm:w-20 sm:h-20 rounded-lg"
+                    src={ball.img}
+                    alt={`Ball ${ball.id}`}
+                    // Use the 16.5 classes for a precise match to 65.6px (66px)
+                    className="object-cover w-16.5 h-16.5 rounded-lg"
                 />
-
               </div>
             ))}
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end items-center p-4 border-t border-gray-800 bg-[#111] space-x-4">
+        <div className="flex justify-end items-center p-4 border-t border-gray-800 bg-[#1a1a1a] space-x-4">
           <button
             onClick={onClose}
-            className="text-white-400 hover:text-white transition text-sm font-medium"
+            className="text-gray-400 hover:text-white transition text-sm font-medium"
           >
             Cancel
           </button>
           <button
             className={`px-6 py-2 rounded-full font-semibold text-white transition 
-              ${selectedBall ? "bg-indigo-600 hover:bg-indigo-700" : "bg-gray-700 cursor-not-allowed"}`}
+              ${selectedBall
+                ? "bg-indigo-600 hover:bg-indigo-700"
+                : "bg-gray-700 cursor-not-allowed"
+              }`}
             disabled={!selectedBall}
           >
             Join

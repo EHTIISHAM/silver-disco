@@ -17,7 +17,15 @@ const schema = new Schema<Game>({
     required: true,
     enum: ["Regular", "Lottery", "Elimination"],
   },
+   entry: {
+    type: String,
+    required: true,
+  },
   gameNumber: {
+    type: Number,
+    required: true,
+  },
+  starttimeofgame: {
     type: Number,
     required: true,
   },
@@ -50,7 +58,7 @@ const schema = new Schema<Game>({
   },
   participants: {
     type: [],
-    required: true,
+    required: false,
     default: [],
   },
   kicked: {

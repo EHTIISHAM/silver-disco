@@ -9,6 +9,9 @@
 /api/dist
 /ui/dist
 
+api.zip
+ui.zip
+
 # testing
 /coverage
 

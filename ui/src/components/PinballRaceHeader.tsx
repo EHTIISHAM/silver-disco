@@ -17,15 +17,15 @@ const PinballRaceHeader: React.FC<Props> = ({
   onNotificationsClick,
 }) => {
   const [userPfp, setUserPfp] = useState<string | undefined>(pfp ?? undefined);
-  const [userName, setUserName] = useState<string | undefined>(username ?? undefined);
+  // const [userName, setUserName] = useState<string | undefined>(username ?? undefined);
   const fallbackPfp = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
   // Fetch user info if props not provided
   useEffect(() => {
     // ✅ If parent provided pfp or username, use them directly
-    if (pfp || username) {
+    if (pfp) {
       setUserPfp(pfp ?? undefined);
-      setUserName(username ?? undefined);
+      // setUserName(username ?? undefined);
       return;
     }
 
@@ -52,7 +52,7 @@ const PinballRaceHeader: React.FC<Props> = ({
 
         if (mounted) {
           setUserPfp(userData.pfp ?? userData.profilePic ?? undefined);
-          setUserName(userData.username ?? undefined);
+          // setUserName(userData.username ?? undefined);
         }
       } catch (err) {
         console.error("Error fetching profile:", err);
@@ -69,14 +69,14 @@ const PinballRaceHeader: React.FC<Props> = ({
       <div className="flex items-center">
         <img
           src={userPfp || fallbackPfp}
-          alt={userName || "User"}
+          // alt={userName || "User"}
           className="w-10 h-10 rounded-full object-cover border-2 border-gray-700"
         />
-        {userName && <span className="ml-2 text-sm font-medium">{userName}</span>}
+        {/* {userName && <span className="ml-2 text-sm font-medium">{userName}</span>} */}
       </div>
 
       <div className="flex justify-center items-center">
-        <img src={logo} alt="Pinball Race Logo" className="h-30 object-contain select-none" />
+        <img src={logo} alt="Pinball Race Logo" className="h-20 object-contain select-none" />
       </div>
 
       <div className="flex items-center space-x-2">

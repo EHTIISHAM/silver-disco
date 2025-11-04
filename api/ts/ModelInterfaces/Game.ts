@@ -22,6 +22,8 @@ export interface Game {
   status: "Not Started" | "Ongoing" | "Finished";
   gameType: "Regular" | "Lottery" | "Elimination";
   gameNumber: number;
+  entry: string;
+  starttimeofgame: number;
   numberOfBalls: number;
   regularBalls: number | undefined;
   bonusBalls: number | undefined;

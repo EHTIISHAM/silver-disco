@@ -40,8 +40,7 @@ if (process.env.CLIENT_URL) {
 } else {
   throw "❌ Invalid application settings: CLIENT_URL missing";
 }
-// print url
-console.log(`https://localhost:${port}`);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -51,7 +50,7 @@ app.use(
     resave: false,
     saveUninitialized: true,
     cookie: {
-      secure: true,
+      secure: process.env.environment === "Production",
       sameSite: "lax",
     },
   })
@@ -77,12 +76,8 @@ if (!process.env.environment) throw "❌ Invalid application settings (environme
 
 if (process.env.environment === "Development") {
   const server = createServer(app);
-    const io = new Server(server, {
-    cors: {
-        origin: process.env.CLIENT_URL, 
-        credentials: true,
-    },
-    });
+  const io = new Server(server, { cors: { origin: "*" } }); // ✅ Attach io correctly
+
   socketServer(server); // your existing socketServer logic
   const gameNamespace = io.of("/game");
   games(gameNamespace);
@@ -99,14 +94,20 @@ if (process.env.environment === "Development") {
   const cert = readFileSync(process.env.TLS);
 
   const server = createHttpsServer({ key, cert, rejectUnauthorized: false }, app);
-    const io = new Server(server, {
-    cors: {
-        origin: process.env.CLIENT_URL,
-        methods: ["GET", "POST"],
-        credentials: true,
-    },
-    });
-    (global as any).socketIO = io;
+const io = new Server(server, {
+  cors: {
+    origin: [
+      "https://pinballrace.com",
+      "https://www.pinballrace.com",
+      "https://pinballrace.com:8080",
+      "http://localhost:3000" // (optional, for local dev)
+    ],
+    credentials: true,
+    methods: ["GET", "POST"],
+    allowedHeaders: ["Authorization", "Content-Type"],
+  },
+  transports: ["websocket", "polling"],
+});
   socketServer(server);
   const gameNamespace = io.of("/game");
   games(gameNamespace);

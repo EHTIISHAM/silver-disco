@@ -2,6 +2,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 
 export interface ILeaderboardTemp extends Document {
   username: string;
+  player: string;
   pfp: string;
   races: number;
   wins: number;
@@ -13,6 +14,7 @@ export interface ILeaderboardTemp extends Document {
 
 const leaderboardTempSchema = new Schema<ILeaderboardTemp>({
   username: { type: String, required: true },
+  player: String,
   pfp: String,
   races: Number,
   wins: Number,

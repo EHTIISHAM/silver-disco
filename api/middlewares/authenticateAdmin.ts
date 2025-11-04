@@ -7,7 +7,7 @@ export default async function authenticateAdmin(
   req: Request,
   res: Response,
   next: NextFunction
-): Promise<any> {
+):Promise<any> {
   try {
     const token = req.cookies.adminToken;
     if (!token)

@@ -6,7 +6,7 @@ import Medal_start1 from "../assets/medalstar.png";
 import Medal1 from "../assets/medal.png";
 import clock from "../assets/Leading-icon.png";
 import timer from "../assets/timer.png";
-import ball5 from "../assets/5balls/03.png";
+import ball5 from "../assets/5balls/05.png";
 import hashtag from "../assets/hashtag.png";
 import gift from "../assets/gift.png";
 import FavoriteBalls from "./FavoriteBalls";
@@ -25,7 +25,7 @@ import {
 // 🟣 Weekly Points Graph (kept as you had it)
 const WeeklyPointsTrend = ({ graphData }: { graphData: any[] }) => {
   return (
-    <div className="w-full max-w-md bg-[#121212] rounded-xl p-4 shadow-lg mt-6">
+    <div className="w-full max-w-md bg-[#1c1c22] rounded-xl p-4 shadow-lg mt-6">
       <h3 className="text-white font-semibold text-lg mb-4">
         Weekly Points Trend
       </h3>
@@ -133,29 +133,28 @@ const PerformanceStats = () => {
   }
 
   return (
-    // need to create a round box around it
-    <div className="box-border flex flex-col items-start p-3 gap-5 bg-[#121212] border border-[#242424] rounded-[20px] mx-auto">
+    <div className="w-full max-w-md">
       <h2 className="text-white font-semibold text-2xl mb-4">Stats</h2>
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-[#1f1f1f] rounded-xl p-5 flex flex-col items-center justify-center shadow-lg">
+        <div className="bg-[#1c1c22] rounded-xl p-5 flex flex-col items-center justify-center shadow-lg">
           <p className="text-4xl font-bold text-white mb-1">
             {stats.totalRaces}
           </p>
           <p className="text-sm text-gray-400">Total races</p>
         </div>
-        <div className="bg-[#1f1f1f] rounded-xl p-5 flex flex-col items-center justify-center shadow-lg">
+        <div className="bg-[#1c1c22] rounded-xl p-5 flex flex-col items-center justify-center shadow-lg">
           <p className="text-4xl font-bold text-green-500 mb-1">
             {stats.totalPoints}
           </p>
           <p className="text-sm text-gray-400">Total points</p>
         </div>
-        <div className="bg-[#1f1f1f] rounded-xl p-5 flex flex-col items-center justify-center shadow-lg">
+        <div className="bg-[#1c1c22] rounded-xl p-5 flex flex-col items-center justify-center shadow-lg">
           <p className="text-4xl font-bold text-blue-400 mb-1">
             {stats.totalWins}
           </p>
           <p className="text-sm text-gray-400">Number of wins</p>
         </div>
-        <div className="bg-[#1f1f1f] rounded-xl p-5 flex flex-col items-center justify-center shadow-lg">
+        <div className="bg-[#1c1c22] rounded-xl p-5 flex flex-col items-center justify-center shadow-lg">
           <p className="text-4xl font-bold text-red-400 mb-1">
             {stats.finishRate}%
           </p>
@@ -232,12 +231,12 @@ export default function RaceHistory() {
   ];
 
   return (
-    <div className="w-full max-w-md box-border flex flex-col items-start p-3 gap-5bg-[#121212] border border-[#242424] rounded-[20px] self-stretch flex-none order-1 z-[1] m-auto">
+    <div className="min-h-screen bg-[#121212] text-white p-4 md:p-8 flex flex-col items-center">
       {/* Tabs */}
       <div className="flex bg-[#1c1c22] rounded-xl p-1 mb-6 w-full max-w-md">
         <button
           className={`flex-1 py-2 rounded-lg text-sm font-medium ${
-            activeTab === "history" ? "bg-[#8b6fed]" : "text-gray-400"
+            activeTab === "history" ? "bg-purple-600" : "text-gray-400"
           }`}
           onClick={() => setActiveTab("history")}
         >
@@ -333,7 +332,7 @@ export default function RaceHistory() {
             {races.map((race, index) => (
               <div
                 key={index}
-                className="bg-[#1f1f1f] rounded-2xl p-4 border border-gray-800 shadow-lg"
+                className="bg-[#121212] rounded-2xl p-4 border border-gray-800 shadow-lg"
               >
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-white font-medium">{race.id}</span>
@@ -377,16 +376,16 @@ export default function RaceHistory() {
                     <p className="text-xs text-gray-500 mt-2">Your position</p>
                   </div>
 
-                  {/* Your ball: shows '#' and ball number 7 on Left */}
-                    <div className="flex items-center justify-between bg-[#121212] rounded-xl p-3">
-                    <div className="flex flex-col items-start">
-                        <div className="flex items-center gap-2">
-                        <img src={hashtag} alt="#" className="w-5 h-5 object-contain" />
-                        <img src={ball5} alt="ball" className="w-5 h-5 object-contain" />
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1">Your ball</p>
+                  {/* Your ball: shows '#' and ball number 7 on right */}
+                  <div className="flex items-center justify-between bg-[#121212] rounded-xl p-3">
+                    <div>
+                      <img src={hashtag}  alt="winner" className="w-5 h-5 object-contain" />
+                      <p className="text-xs text-gray-500 mt-1">Your ball</p>
                     </div>
+                    <div className="text-purple-400 font-semibold text-lg">
+                    <img src={ball5}  alt="winner" className="w-5 h-5 object-contain" />
                     </div>
+                  </div>
                 </div>
 
                 {/* Top 3 finishers */}

@@ -33,3 +33,4 @@ const PointsDistribution = () => {
 };
 
 export default PointsDistribution;
+

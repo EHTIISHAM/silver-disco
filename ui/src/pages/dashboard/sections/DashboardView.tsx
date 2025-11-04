@@ -6,11 +6,11 @@ import { MdDelete } from "react-icons/md";
 import { cloneDeep, isEqual } from "lodash-es";
 import { nanoid } from "nanoid";
 
-function getCookie(name: string) {
-  const value = `; ${document.cookie}`;
-  const parts: any = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop().split(";").shift();
-}
+// function getCookie(name: string) {
+//   const value = `; ${document.cookie}`;
+//   const parts: any = value.split(`; ${name}=`);
+//   if (parts.length === 2) return parts.pop().split(";").shift();
+// }
 
 function choose(n: number, k: number): number {
   if (k == 0) {
@@ -22,8 +22,8 @@ function choose(n: number, k: number): number {
 
 const DashboardView = () => {
   const serverUrl: string = import.meta.env.VITE_SERVER_URL;
-  const [username, setUsername] = useState<string | undefined>();
-  const [pfp, setPfp] = useState<string | undefined>();
+  // const [username, setUsername] = useState<string | undefined>();
+  // const [pfp, setPfp] = useState<string | undefined>();
   const [gameType, setGameType] = useState("Regular");
   const [prizes, setPrizes] = useState([]);
   const currentImageRef = useRef<any>();
@@ -65,26 +65,26 @@ const DashboardView = () => {
     if (currentGame) currentGameIdRef.current = currentGame._id;
   }, [currentGame]);
 
-  useEffect(() => {
-    axios({
-      withCredentials: true,
-      url: `${serverUrl}/get_admin_profile`,
-      method: "GET",
-    })
-      .then((response) => {
-        setUsername(response.data.username);
-        setPfp(response.data.pfp);
-      })
-      .catch((e) => {
-        console.error(e);
-      });
-  }, []);
+  // useEffect(() => {
+  //   axios({
+  //     withCredentials: true,
+  //     url: `${serverUrl}/get_admin_profile`,
+  //     method: "GET",
+  //   })
+  //     .then((response) => {
+  //       setUsername(response.data.username);
+  //       setPfp(response.data.pfp);
+  //     })
+  //     .catch((e) => {
+  //       console.error(e);
+  //     });
+  // }, []);
 
   useEffect(() => {
     if (socketRef.current == null) {
       socketRef.current = io(`${import.meta.env.VITE_WS_URL}/games`, {
         auth: {
-          adminToken: getCookie("adminToken"),
+          // adminToken: getCookie("adminToken"),
         },
         forceNew: true,
       });
@@ -366,10 +366,12 @@ const DashboardView = () => {
 
   return (
     <>
-      <Headers pfp={pfp} username={username} />
+      {/* <Headers pfp={pfp} username={username} /> */}
+      <Headers />
       
       <div className="content-container">
-        <h1>Welcome, {username}.</h1>
+        {/* <h1>Welcome, {username}.</h1> */}
+        <h1>Welcome, .</h1>
         
         <br />
         <br />

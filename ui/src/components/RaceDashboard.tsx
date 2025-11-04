@@ -1,9 +1,18 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { FaUser, FaGift } from "react-icons/fa";
-import { IoTimeOutline } from "react-icons/io5";
 import JoinRaceModal from "../components/JoinRaceModal";
+import leadingicon from "../assets/Leading-icon.png";
+import contact from "../assets/contact.png";
+import gift from "../assets/gift.png";
+import entry from "../assets/entry.png";
+import cup from "../assets/cup.png";
+import calendar from "../assets/calendar.png";
+import b1 from "../assets/5balls/01.png";
+import b2 from "../assets/5balls/02.png";
+import b3 from "../assets/5balls/03.png";
+import b4 from "../assets/5balls/04.png";
+import b5 from "../assets/5balls/05.png";
 
 // ✅ Dynamic ProgressBar Component (added inline)
 interface ProgressBarProps {
@@ -11,28 +20,69 @@ interface ProgressBarProps {
   maxTime?: number; // default 10
 }
 
-const ProgressBar: React.FC<ProgressBarProps> = ({ time, maxTime = 10 }) => {
+interface Game {
+  status: "Not Started" | "Ongoing" | "Finished";
+  gameType: string;
+  gameNumber?: number;
+  starttimeofgame?: number; 
+  timerPerRace?: string | number;
+  participants?: any[];
+  entry?: string;
+  prizeId?: string;
+}
+
+interface GameResponse {
+  games: Game[];
+}
+
+
+
+const ProgressBar: React.FC<ProgressBarProps> = ({ time = 0, maxTime = 10 }) => {
   const percentage = Math.min((time / maxTime) * 100, 100);
 
   return (
     <div className="w-full">
-      <div className="w-full bg-gray-800 rounded-full h-2 mb-2">
-        <div
-          className="bg-[#8b6fed] h-2 rounded-full transition-all duration-500 ease-in-out"
-          style={{ width: `${percentage}%` }}
-        ></div>
+      <div className="flex items-center justify-between mb-2">
+        <div className="w-full bg-gray-800 rounded-full h-2 mr-2">
+          <div
+            className="bg-[#8a6fec] h-2 rounded-full transition-all duration-500 ease-in-out"
+            style={{ width: `${percentage}%` }}
+          ></div>
+        </div>
+        <p className="text-xs text-gray-400 whitespace-nowrap">
+          {time ? `${time} min` : "0 min"}
+        </p>
       </div>
-      <p className="text-right text-xs text-gray-400 mb-3">{time} min</p>
     </div>
   );
 };
 
+
 const RaceDashboard: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [recentRaces, setRecentRaces] = useState<any[]>([]);
+  const [games, setGames] = useState<Game[]>([]);
+  const currentGameType = games[0]?.gameType || "----";
+  const currentGameNumber = games[0]?.gameNumber || "----";
+  const currentRaceTime = parseInt(games[0]?.timerPerRace?.toString() || "0", 10);
+  const gamestarttime = games[0]?.starttimeofgame || "xx:xx";
+  const participantsCount = games[0]?.participants?.length || 0;
+  const currentEntry = games[0]?.entry || "---";
+  const currentgift = games[0]?.prizeId || "---";
+  
 
-  // Example dynamic time value
-  const currentRaceTime = 3; // 0–10 range for demo
+
+
+
+
+
+
+
+  
+
+
+
+
 
   // ✅ Fetch data from backend LeaderboardTemp
   useEffect(() => {
@@ -64,63 +114,148 @@ const RaceDashboard: React.FC = () => {
   fetchRecentRaces();
 }, []);
 
+useEffect(() => {
+  const fetchGames = async () => {
+    try {
+      console.log("🎮 Fetching game data...");
+      const res = await fetch(`${import.meta.env.VITE_SERVER_URL}/api/games`);
+
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+
+      const data: GameResponse = await res.json(); // ✅ typed response
+      console.log("✅ Game data received:", data);
+
+      if (Array.isArray(data.games)) {
+        const gamesList = data.games;
+
+        // 1️⃣ Find ongoing game
+        const ongoingGame = gamesList.find((g) => g.status === "Ongoing");
+
+        if (ongoingGame) {
+          setGames([ongoingGame]);
+        } else {
+          // 2️⃣ Find nearest upcoming game
+          const upcomingGames = gamesList
+            .filter((g) => g.status === "Not Started" && typeof g.starttimeofgame === "number")
+            .sort((a, b) => a.starttimeofgame! - b.starttimeofgame!);
+
+          if (upcomingGames.length > 0) {
+            setGames([upcomingGames[0]]);
+          } else {
+            setGames([]);
+          }
+        }
+      } else {
+        console.warn("⚠ Unexpected structure:", data);
+      }
+    } catch (err) {
+      console.error("❌ Error fetching games:", err);
+    }
+  };
+
+  fetchGames();
+}, []);
+
 
   return (
     <div className="w-full flex justify-center px-3 sm:px-6 lg:px-10 py-6">
       <div className="w-full max-w-6xl text-white grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* ----- Current Race ----- */}
-        <div className="bg-[#111] rounded-2xl p-4 shadow border border-gray-800 flex flex-col justify-between">
-          <div>
-            <h2 className="text-sm text-gray-400 mb-1">
-              Current race <span className="text-indigo-400">( ---- )</span>
-            </h2>
-            <p className="text-gray-300 text-sm mb-3">#xxxxxxxx</p>
+        <div className="bg-[#121212] rounded-2xl p-4 shadow border border-gray-800 flex flex-col justify-between">
+  <div>
+    <h2 className="text-sm text-white-600 mb-1">
+      Current race{" "}
+      <span className="text-indigo-400">
+        ({currentGameType ? currentGameType : "null"})
+      </span>
+    </h2>
+    <p className="text-gray-300 text-sm mb-3">
+      #{currentGameNumber}
+    </p>
 
-            {/* ✅ Dynamic Progress Bar */}
-            <ProgressBar time={currentRaceTime} maxTime={10} />
 
-            {/* Info grid */}
-            <div className="grid grid-cols-2 gap-2 text-sm mb-4">
-              <div className="bg-[#1a1a1a] p-2 rounded-lg flex flex-col items-center justify-center text-center">
-                <span className="flex items-center space-x-1 mb-1 text-base font-semibold">
-                  <IoTimeOutline /> <span>xx:xx</span>
-                </span>
-                <span className="text-gray-400 text-xs">Start time</span>
-              </div>
+    {/* ✅ Dynamic Progress Bar */}
+    <ProgressBar time={currentRaceTime} maxTime={10} />
 
-              <div className="bg-[#1a1a1a] p-2 rounded-lg flex flex-col items-center justify-center text-center">
-                <span className="flex items-center space-x-1 mb-1 text-base font-semibold">
-                  <FaUser /> <span>xx</span>
-                </span>
-                <span className="text-gray-400 text-xs">Participants</span>
-              </div>
 
-              <div className="bg-[#1a1a1a] p-2 rounded-lg flex flex-col items-center justify-center text-center">
-                <span className="mb-1 text-base font-semibold">---</span>
-                <span className="text-gray-400 text-xs">Entry</span>
-              </div>
+    {/* Info grid */}
+    <div className="grid grid-cols-2 gap-2 text-sm mb-4">
 
-              <div className="bg-[#1a1a1a] p-2 rounded-lg flex flex-col items-center justify-center text-center">
-                <span className="flex items-center space-x-1 mb-1 text-base font-semibold">
-                  <FaGift /> <span>---</span>
-                </span>
-                <span className="text-gray-400 text-xs">Prize</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Join Button */}
-          <button
-            className="w-full bg-black text-white font-semibold py-2 rounded-3xl border border-[#522cab] hover:border-blue-600 hover:bg-[#0a0a0a] transition"
-            onClick={() => setShowModal(true)}
-          >
-            Join next match
-          </button>
+      {/* 🕓 Start Time */}
+      <div className="bg-[#1a1a1a] p-2 rounded-lg flex flex-col items-start text-left">
+        <div className="flex items-center justify-start gap-2">
+          <img
+            src={leadingicon}
+            alt="Clock Icon"
+            className="w-4 h-4 object-contain opacity-80"
+          />
+          <span className="text-xl font-semibold text-white leading-none">{gamestarttime}</span>
         </div>
+        <span className="text-gray-400 text-xs ml-6 mt-1">Start time</span>
+      </div>
+
+      {/* 👥 Participants */}
+      <div className="bg-[#1a1a1a] p-2 rounded-lg flex flex-col items-start text-left">
+        <div className="flex items-center justify-start gap-2">
+          <img
+            src={contact}
+            alt="Participants Icon"
+            className="w-5 h-5 rounded-full object-cover"
+          />
+          <span className="text-base font-semibold text-white">
+            {participantsCount}
+          </span>
+
+        </div>
+        <span className="text-gray-400 text-xs ml-6 mt-1">Participants</span>
+      </div>
+
+      {/* 💸 Entry */}
+      <div className="bg-[#1a1a1a] p-2 rounded-lg flex flex-col items-start text-left">
+        <div className="flex items-center justify-start gap-2">
+          <img
+            src={entry}
+            alt="Entry Icon"
+            className="w-5 h-5 object-contain"
+          />
+          <span className="text-base font-semibold text-white">{currentEntry}</span>
+
+        </div>
+        <span className="text-gray-400 text-xs ml-6 mt-1">Entry</span>
+      </div>
+
+      {/* 🏆 Prize */}
+      <div className="bg-[#1a1a1a] p-2 rounded-lg flex flex-col items-start text-left">
+        <div className="flex items-center justify-start gap-2">
+          <img
+            src={gift}
+            alt="Prize Icon"
+            className="w-5 h-5 object-contain"
+          />
+          <span className="text-base font-semibold text-white">{currentgift}</span>
+        </div>
+        <span className="text-gray-400 text-xs ml-6 mt-1">Prize</span>
+      </div>
+
+    </div>
+  </div>
+
+  {/* 🔘 Join Button */}
+  <button
+    className="w-full bg-[#121212] text-white font-semibold py-2 rounded-3xl border border-[#522cab] hover:border-blue-600 hover:bg-[#0a0a0a] transition"
+    onClick={() => setShowModal(true)}
+  >
+    Join next match
+  </button>
+</div>
+
+
 
         {/* ----- Recent Races (Fetched from Backend) ----- */}
-        <div className="bg-[#111] rounded-2xl p-4 shadow border border-gray-800">
-          <h2 className="text-sm text-gray-400 mb-3">Recent races</h2>
+        {/* <div className="bg-[#111] rounded-white 2xl p-4 shadow border border-gray-800"> */}
+        <div className="bg-[#121212] rounded-2xl p-4 shadow border border-gray-800 flex flex-col justify-between">
+
+          
+          <h2 className="text-sm text--400 mb-3">Recent races</h2>
 
           {recentRaces.length === 0 ? (
             <p className="text-gray-500 text-sm">No recent races found</p>
@@ -131,81 +266,91 @@ const RaceDashboard: React.FC = () => {
                 className="flex items-center justify-between bg-[#1a1a1a] p-3 rounded-xl mb-2 hover:bg-gray-800 transition"
               >
                 <div className="flex items-center space-x-3">
-                  {race.pfp ? (
-                    <img
-                      src={race.pfp}
-                      alt={race.username}
-                      className="w-8 h-8 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-gray-300 text-xs">
-                      ?
-                    </div>
-                  )}
                   <div>
-                    <p className="text-sm font-semibold">
+                    <p className="text-sm">
                       {race.raceId}
                     </p>
-                    <p className="text-xs text-gray-400">
-                      Winner:{" "}
-                      <span className="text-indigo-400">
-                        {race.username || "N/A"}
-                      </span>{" "}
-                      • {race.type}
+                   <p className="text-sm text-gray-400">
+                      <span className="text-[#8b6fed] text-xs font-bold">Winner</span> •{" "}
+                      <span className="text-[#767676]">{race.username || "N/A"}</span> •{" "}
+                      <span className="text-[#767676]">{race.player}</span>
                     </p>
-                    <div className="mt-1 space-x-1 text-lg">
-                      <span>🎱</span>
-                      <span>🔥</span>
-                      <span>🏆</span>
+
+                    <div className="mt-1 flex items-center space-x-2">
+                      <img src={b1} alt="Ball 1" className="w-5 h-5 object-contain" />
+                      <img src={b2} alt="Ball 2" className="w-5 h-5 object-contain" />
+                      <img src={b3} alt="Ball 3" className="w-5 h-5 object-contain" />
+                      <img src={b4} alt="Ball 4" className="w-5 h-5 object-contain" />
+                      <img src={b5} alt="Ball 5" className="w-5 h-5 object-contain" />
                     </div>
+
                   </div>
                 </div>
-                <span className="text-gray-400 text-lg">&gt;</span>
+                <span className="text-white-400 text-lg">&gt;</span>
               </div>
             ))
           )}
         </div>
 
         {/* ----- Championship ----- */}
-        <div className="relative rounded-2xl p-4 shadow border border-gray-800 flex flex-col justify-between overflow-hidden">
-<div className="absolute inset-0 bg-[linear-gradient(to_right,_#3730a3_0%,_#312e81_30%,_#000000_80%,_#000000_100%)]"></div>
+         <div className="relative rounded-2xl p-4 shadow border border-gray-800 flex flex-col justify-between overflow-hidden">
+  {/* 🎨 Updated gradient — 20% purple then fade to black */}
+  <div className="absolute inset-0 bg-[linear-gradient(to_right,_rgba(69,38,140,0.5)_0%,_rgba(69,38,140,0.5)_20%,_rgba(0,0,0,1)_100%)]"></div>
 
+  <div className="relative z-10">
+    <h2 className="text-sm font-semibold mb-1 text-white">
+      October speed championship
+    </h2>
+    <p className="text-xs text-gray-400 mb-3">Sponsored by pinballrace.com</p>
 
-
-
-          <div className="relative z-10">
-            <h2 className="text-sm font-semibold mb-1 text-white">
-              September speed championship
-            </h2>
-            <p className="text-xs text-gray-400 mb-3">
-              Sponsored by Lorem Ipsum
-            </p>
-
-            <div className="grid grid-cols-2 gap-2 text-sm mb-4">
-              <div className="bg-white/5 backdrop-blur-md p-3 rounded-xl border border-white/10 flex flex-col items-center justify-center text-center">
-                <span className="mb-1 text-base font-semibold text-white">
-                  12 Days
-                </span>
-                <span className="text-gray-400 text-xs">Left</span>
-              </div>
-
-              <div className="bg-white/5 backdrop-blur-md p-3 rounded-xl border border-white/10 flex flex-col items-center justify-center text-center">
-                <span className="flex items-center space-x-1 mb-1 text-base font-semibold text-white">
-                  <FaUser /> <span>256</span>
-                </span>
-                <span className="text-gray-400 text-xs">Participants</span>
-              </div>
-
-              <div className="col-span-2 bg-white/5 backdrop-blur-md p-3 rounded-xl border border-white/10 flex flex-col items-center justify-center text-center">
-                <span className="flex items-center space-x-1 mb-1 text-base font-semibold text-white">
-                  <FaGift /> <span>$500</span>
-                </span>
-                <span className="text-gray-400 text-xs">Gift card prize</span>
-              </div>
-            </div>
-          </div>
+    {/* Info boxes */}
+    <div className="grid grid-cols-2 gap-2 text-sm mb-4">
+      {/* 🗓 Left box (Days Left) */}
+      <div className="bg-white/5 backdrop-blur-md p-3 rounded-xl border border-white/10 flex flex-col items-start text-left">
+        <div className="flex items-center justify-start space-x-2 mb-1">
+          <img
+            src={calendar}
+            alt="Calendar Icon"
+            className="w-5 h-5 object-contain"
+          />
+          <span className="text-base font-semibold text-white">12 Days</span>
         </div>
+        <span className="text-gray-400 text-xs ml-6">Left</span>
       </div>
+
+      {/* 👥 Participants */}
+      <div className="bg-white/5 backdrop-blur-md p-3 rounded-xl border border-white/10 flex flex-col items-start text-left">
+        <div className="flex items-center justify-start space-x-2 mb-1">
+          <img
+            src={contact}
+            alt="Contact Icon"
+            className="w-5 h-5 object-contain"
+          />
+          <span className="text-base font-semibold text-white">47</span>
+        </div>
+        <span className="text-gray-400 text-xs ml-6">Participants</span>
+      </div>
+
+      {/* 🏆 Gift card prize */}
+      <div className="col-span-2 bg-white/5 backdrop-blur-md p-3 rounded-xl border border-white/10 flex flex-col items-start text-left">
+        <div className="flex items-center justify-start space-x-2 mb-1">
+          <img
+            src={cup}
+            alt="Trophy Icon"
+            className="w-5 h-5 object-contain"
+          />
+          <span className="text-base font-semibold text-white">$320</span>
+        </div>
+        <span className="text-gray-400 text-xs ml-6">Gift card prize</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+</div>
+
 
       {showModal && <JoinRaceModal onClose={() => setShowModal(false)} />}
     </div>
