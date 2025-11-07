@@ -13,16 +13,20 @@ import base64
 import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
-
+from bson import ObjectId
 from fastapi import FastAPI, Request, Form, Response, HTTPException, status
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from passlib.hash import bcrypt
 from pydantic import BaseModel
 from dotenv import load_dotenv
+
+from utils.utils import router as utils_router
+
 
 load_dotenv()
 
@@ -32,7 +36,20 @@ SECRET_KEY = os.getenv("SECRET_KEY", "supersecret")
 SESSION_EXPIRE_SECONDS = int(os.getenv("SESSION_EXPIRE_SECONDS", "86400"))
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://pinballrace.com",
+        "https://www.pinballrace.com",
+        "http://localhost:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+app.include_router(utils_router)
 
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -42,14 +59,20 @@ mongo = AsyncIOMotorClient(MONGO_URI)
 db = mongo[DB_NAME]
 
 # ---------- Utilities ----------
-async def get_next_sequence(name: str) -> int:
-    """Auto-increment counter for gameNumber etc."""
+async def get_next_sequence( name: str) -> int:
+    """Auto-increment counter that resets daily."""
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+
+    # Use a compound key so each day has its own counter
+    key = f"{name}_{today}"
+
     r = await db.counters.find_one_and_update(
-        {"_id": name},
+        {"_id": key},
         {"$inc": {"seq": 1}},
         upsert=True,
         return_document=True,
     )
+
     return r["seq"]
 
 def hash_password(plain: str) -> str:
@@ -61,6 +84,70 @@ def verify_password(plain: str, hashed: str) -> bool:
     except Exception:
         return False
 
+async def scheduler():
+    """Continuously manages game status transitions."""
+    while True:
+        # 1️⃣ Fetch all 'Not Started' games in order
+        games_cursor = db.games.find({"status": "Not Started"}).sort("createdAt", 1)
+        games = await games_cursor.to_list(length=None)
+
+        if not games:
+            print("⏸️ No upcoming games found — checking again in 30s.")
+            await asyncio.sleep(30)
+            continue
+
+        print(f"🎯 Found {len(games)} 'Not Started' games to schedule")
+
+        # 2️⃣ Start with the first game as 'initial'
+        initial_game = games[0]
+        current_start = datetime.utcfromtimestamp(initial_game["createdAt"] / 1000) \
+                        + timedelta(minutes=initial_game["timerTillNextGame"])
+
+        # process all games one by one
+        for i, game in enumerate(games):
+            game_id = game["_id"]
+            created_at = datetime.utcfromtimestamp(game["createdAt"] / 1000)
+            timer_minutes = game["timerTillNextGame"]
+
+            start_time = created_at + timedelta(minutes=timer_minutes)
+
+
+            now = datetime.utcnow()
+            wait_seconds = (start_time - now).total_seconds()
+            if wait_seconds < 0:
+                print(f"⚠️ Game {game_id} start time already passed, starting immediately. Wait: {wait_seconds:.2f}")
+                wait_seconds = 0
+
+            print(f"🕒 Game {i+1}: {game_id} will start in {wait_seconds:.2f}s")
+
+            # 3️⃣ Wait until the start time
+            await asyncio.sleep(wait_seconds)
+
+            # 4️⃣ Mark as Ongoing
+            await db.games.update_one(
+                {"_id": game_id},
+                {"$set": {"status": "Ongoing"}}
+            )
+            print(f"🚀 Game {game_id} is now Ongoing")
+
+            # 5️⃣ Wait for the game duration (you can customize actual duration)
+            game_duration = game["timerTillNextGame"] * 60
+            await asyncio.sleep(game_duration)
+
+            # 6️⃣ Mark as Finished
+            await db.games.update_one(
+                {"_id": game_id},
+                {"$set": {"status": "Finished"}}
+            )
+            print(f"🏁 Game {game_id} is now Finished")
+
+            # 7️⃣ Move current_start forward for next game
+            current_start = start_time + timedelta(minutes=game["timerTillNextGame"])
+
+        # 8️⃣ After finishing all games, sleep a bit before rechecking
+        print("✅ All pending games processed. Waiting for new games...")
+        await asyncio.sleep(30)
+
 async def create_session(username: str) -> str:
     sid = base64.urlsafe_b64encode(uuid.uuid4().bytes).decode().rstrip("=")
     expires_at = datetime.utcnow() + timedelta(seconds=SESSION_EXPIRE_SECONDS)
@@ -71,6 +158,34 @@ async def create_session(username: str) -> str:
         "expires_at": expires_at
     })
     return sid
+
+async def fetch_prize(prize_id: str) -> Optional[Dict[str, Any]]:
+    prize = await db.prizes.find_one({"_id": prize_id})
+    return prize['title'] if prize else None
+
+async def create_points_only_prize() -> str:
+    # we can have the id stored in .env
+    points_only_prize_id = os.getenv("POINTS_ONLY_PRIZE_ID")
+    if points_only_prize_id:
+        existing = await db.prizes.find_one({"_id": points_only_prize_id})
+        if existing:
+            return existing["_id"]
+
+    # check if a Points Only entry exists
+    existing = await db.prizes.find_one({"title": "Points Only"})
+    if existing:
+        os.environ["POINTS_ONLY_PRIZE_ID"] = str(existing["_id"])
+        return str(existing["_id"])
+
+    prize_doc = {
+        "title": "Points Only",
+        "description": "No physical prize, points only reward.",
+        "createdAt": datetime.utcnow()
+    }
+    result = await db.prizes.insert_one(prize_doc)
+    os.environ["POINTS_ONLY_PRIZE_ID"] = str(result.inserted_id)
+
+    return str(result.inserted_id)
 
 async def get_session(sid: str):
     if not sid: 
@@ -217,11 +332,12 @@ async def api_new_game(
 ):
     await require_login(request)
     
-    if not prize or prize == "Select":
-        raise HTTPException(400, "Please select a prize")
+    if prize == "Points Only":
+        prize = await create_points_only_prize()
     
     game_number = await get_next_sequence("gameNumber")
-    
+    # game_number is game_number+ddmmyyyy
+    game_number = f"{game_number}{datetime.utcnow().strftime('%d%m%Y')}"
     # Convert timer to minutes for storage
     timer_minutes = int(timerTillNextGame)
     
@@ -232,6 +348,7 @@ async def api_new_game(
         "numberOfBalls": 12,
         "bonusBalls": 0,
         "prizeId": prize,
+        "prizeTitle": await fetch_prize(prize) if prize else "Points Only",
         "timerTillNextGame": timer_minutes,
         "participants": [],
         "kicked": [],
@@ -324,9 +441,12 @@ async def api_delete_prize(request: Request, prize_id: str = Form(...)):
 # ---------- Startup: ensure counters exist ----------
 @app.on_event("startup")
 async def startup_event():
+    asyncio.create_task(scheduler())
     env_admin = os.getenv("ADMIN_USERNAME")
     env_pass = os.getenv("ADMIN_PASSWORD")
     env_hash = os.getenv("ADMIN_PASSWORD_HASH")
+    # points only prize check on startup
+    await create_points_only_prize()
     if env_admin and (env_pass or env_hash):
         existing = await db.admins.find_one({"username": env_admin})
         if not existing:

@@ -20,15 +20,28 @@ interface ProgressBarProps {
   maxTime?: number; // default 10
 }
 
+function getNextRaceStartTime(createdAt: number, timerTillNextRace?: number): string {
+  const minutes = timerTillNextRace || 0;
+  const startDate = new Date(createdAt + minutes * 60 * 1000);
+
+  // Format to HH:MM (24-hour)
+  const hours = startDate.getHours().toString().padStart(2, "0");
+  const mins = startDate.getMinutes().toString().padStart(2, "0");
+
+  return `${hours}:${mins}`;
+}
+
+
 interface Game {
   status: "Not Started" | "Ongoing" | "Finished";
   gameType: string;
-  gameNumber?: number;
-  starttimeofgame?: number; 
-  timerPerRace?: string | number;
+  gameNumber?: string;
+  timerTillNextGame?: number; // backend sends int
   participants?: any[];
   entry?: string;
   prizeId?: string;
+  prizeTitle?: string | null;
+  createdAt: number; // fix from createdAT
 }
 
 interface GameResponse {
@@ -64,11 +77,13 @@ const RaceDashboard: React.FC = () => {
   const [games, setGames] = useState<Game[]>([]);
   const currentGameType = games[0]?.gameType || "----";
   const currentGameNumber = games[0]?.gameNumber || "----";
-  const currentRaceTime = parseInt(games[0]?.timerPerRace?.toString() || "0", 10);
-  const gamestarttime = games[0]?.starttimeofgame || "xx:xx";
+  const currentRaceTime = games[0]?.timerTillNextGame || 0;
+  const createdAt = games[0]?.createdAt || 0;
+  const starttimeofgame = getNextRaceStartTime(createdAt, currentRaceTime);
+  const gamestarttime = starttimeofgame || "xx:xx";
   const participantsCount = games[0]?.participants?.length || 0;
-  const currentEntry = games[0]?.entry || "---";
-  const currentgift = games[0]?.prizeId || "---";
+  const currentEntry = games[0]?.entry || "free";
+  const currentgift = games[0]?.prizeTitle || "Points Only";
   
 
 
@@ -118,38 +133,44 @@ useEffect(() => {
   const fetchGames = async () => {
     try {
       console.log("🎮 Fetching game data...");
-      const res = await fetch(`${import.meta.env.VITE_SERVER_URL}/api/games`);
+      const res = await fetch(`${import.meta.env.VITE_PY_SERVER_URL}/api/games/fetch`);
 
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
 
-      const data: GameResponse = await res.json(); // ✅ typed response
-      console.log("✅ Game data received:", data);
+      const data: GameResponse = await res.json(); 
 
-      if (Array.isArray(data.games)) {
+        if (Array.isArray(data.games)) {
         const gamesList = data.games;
 
-        // 1️⃣ Find ongoing game
         const ongoingGame = gamesList.find((g) => g.status === "Ongoing");
-
         if (ongoingGame) {
-          setGames([ongoingGame]);
+            setGames([ongoingGame]);
         } else {
-          // 2️⃣ Find nearest upcoming game
-          const upcomingGames = gamesList
-            .filter((g) => g.status === "Not Started" && typeof g.starttimeofgame === "number")
-            .sort((a, b) => a.starttimeofgame! - b.starttimeofgame!);
+            const upcomingGames = gamesList
+            .filter((g) => g.status === "Not Started" && typeof g.createdAt === "number")
+            .sort((a, b) => a.createdAt! - b.createdAt!);
 
-          if (upcomingGames.length > 0) {
+            if (upcomingGames.length > 0) {
             setGames([upcomingGames[0]]);
-          } else {
-            setGames([]);
-          }
+            } else {
+            // fallback: show most recently finished game
+            const latestFinished = [...gamesList]
+                .filter((g) => g.status === "Finished")
+                .sort((a, b) => b.createdAt! - a.createdAt!)[0];
+
+            if (latestFinished) {
+                setGames([latestFinished]);
+            } else {
+                setGames([]);
+            }
+            }
         }
-      } else {
-        console.warn("⚠ Unexpected structure:", data);
-      }
+        }
+        else{
+            console.error("data fetching good error in filtering")
+        }
     } catch (err) {
-      console.error("❌ Error fetching games:", err);
+      console.error("❌ Error fetching games");
     }
   };
 

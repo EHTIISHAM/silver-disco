@@ -50,7 +50,7 @@
 
               <!-- Timer Till Next Game as Buttons -->
               <div class="form-group">
-                <label>Timer Till Next Game:</label>
+                <label>Timer Till Next Race:</label>
                 <div class="button-group">
                   <input type="radio" id="timer1" name="timerTillNextGame" value="1" hidden>
                   <input type="radio" id="timer2" name="timerTillNextGame" value="2" checked hidden>
@@ -74,7 +74,7 @@
               <div class="form-group">
                 <label>Prize:</label>
                 <select name="prize" required>
-                  <option value="">Select Prize</option>
+                  <option value="Points Only">Points Only</option>
                   {% for p in prizes %}
                     <option value="{{ p._id }}">{{ p.title }}</option>
                   {% endfor %}
