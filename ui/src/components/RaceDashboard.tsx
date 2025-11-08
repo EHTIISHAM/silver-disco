@@ -31,7 +31,22 @@ function getNextRaceStartTime(createdAt: number, timerTillNextRace?: number): st
   return `${hours}:${mins}`;
 }
 
+function getRemainingSeconds(starttimeofgame:string) {
+  const now = new Date();
 
+  // Parse the start time string (HH:mm)
+  const [hours, minutes] = starttimeofgame.split(':').map(Number);
+
+  // Create a Date object for today’s start time
+  const startTime = new Date();
+  startTime.setHours(hours, minutes, 0, 0);
+
+  // Calculate remaining time in seconds
+  const diffMs: number = startTime.getTime() - now.getTime(); // Corrected line
+  const remainingSeconds = Math.max(0, Math.floor(diffMs / 1000));
+
+  return remainingSeconds;
+}
 interface Game {
   status: "Not Started" | "Ongoing" | "Finished";
   gameType: string;
@@ -62,9 +77,6 @@ const ProgressBar: React.FC<ProgressBarProps> = ({ time = 0, maxTime = 10 }) => 
             style={{ width: `${percentage}%` }}
           ></div>
         </div>
-        <p className="text-xs text-gray-400 whitespace-nowrap">
-          {time ? `${time} min` : "0 min"}
-        </p>
       </div>
     </div>
   );
@@ -80,22 +92,12 @@ const RaceDashboard: React.FC = () => {
   const currentRaceTime = games[0]?.timerTillNextGame || 0;
   const createdAt = games[0]?.createdAt || 0;
   const starttimeofgame = getNextRaceStartTime(createdAt, currentRaceTime);
+  const remianingTime = getRemainingSeconds(starttimeofgame)
   const gamestarttime = starttimeofgame || "xx:xx";
   const participantsCount = games[0]?.participants?.length || 0;
   const currentEntry = games[0]?.entry || "free";
   const currentgift = games[0]?.prizeTitle || "Points Only";
   
-
-
-
-
-
-
-
-
-  
-
-
 
 
 
@@ -152,17 +154,10 @@ useEffect(() => {
 
             if (upcomingGames.length > 0) {
             setGames([upcomingGames[0]]);
-            } else {
-            // fallback: show most recently finished game
-            const latestFinished = [...gamesList]
-                .filter((g) => g.status === "Finished")
-                .sort((a, b) => b.createdAt! - a.createdAt!)[0];
 
-            if (latestFinished) {
-                setGames([latestFinished]);
             } else {
                 setGames([]);
-            }
+            
             }
         }
         }
@@ -195,7 +190,7 @@ useEffect(() => {
 
 
     {/* ✅ Dynamic Progress Bar */}
-    <ProgressBar time={currentRaceTime} maxTime={10} />
+    <ProgressBar time={remianingTime} maxTime={currentRaceTime} />
 
 
     {/* Info grid */}
@@ -373,7 +368,9 @@ useEffect(() => {
 </div>
 
 
-      {showModal && <JoinRaceModal onClose={() => setShowModal(false)} />}
+      {showModal && <JoinRaceModal onClose={() => setShowModal(false)}     
+      gameType={currentGameType}
+      gameNumber={currentGameNumber} />}
     </div>
   );
 };

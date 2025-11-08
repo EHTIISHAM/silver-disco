@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException
 from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
 from datetime import datetime
+from bson import ObjectId
 
 load_dotenv()
 
@@ -44,4 +45,35 @@ async def fetch_games_from_db():
 
     except Exception as e:
         print(f"❌ Error fetching games: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+#using email and ball to join the latest not started game
+@router.post("/api/games/join")
+async def join_latest_game(email: str, ball: str):
+    """
+    Join the latest not started game using email and ball.
+    """
+    try:
+        latest_game = await db.games.find_one({
+            "status": "Not Started"
+        }, sort=[("createdAt", -1)])
+
+        if not latest_game:
+            raise HTTPException(status_code=404, detail="No not started game found")
+
+        # Add user to the game
+        await db.games.update_one({"_id": latest_game["_id"]}, {
+            "$addToSet": {
+                "participants": {
+                    "email": email,
+                    "ball": ball
+                }
+            }
+        })
+        latest_game["_id"] = str(latest_game["_id"])
+
+        return {"message": "Successfully joined the game", "game": latest_game}
+
+    except Exception as e:
+        print(f"❌ Error joining game: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")

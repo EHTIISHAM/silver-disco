@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState,useEffect  } from "react";
 import { X } from "lucide-react";
 
 import Ball1 from "../assets/balls/1.png";
@@ -30,11 +30,55 @@ const balls = importedBalls.map((img, index) => ({
 
 interface JoinRaceModalProps {
   onClose: () => void;
+  gameType: string;
+  gameNumber: string;
 }
 
-const JoinRaceModal: React.FC<JoinRaceModalProps> = ({ onClose }) => {
+const JoinRaceModal: React.FC<JoinRaceModalProps> = ({ onClose, gameType, gameNumber }) => {
   const [selectedBall, setSelectedBall] = useState<number | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const serverUrl = import.meta.env.VITE_PY_SERVER_URL;
+  const serverurl1 = import.meta.env.VITE_SERVER_URL
 
+  // Fetch user email on mount
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const res = await fetch(`${serverurl1}/api/user/me`, {
+          credentials: "include",
+        });
+        const data = await res.json();
+        if (data?.user?.email) setUserEmail(data.user.email);
+      } catch (err) {
+        console.error("Failed to fetch user:", err);
+      }
+    };
+    fetchUser();
+  }, [serverurl1]);
+
+  const handleJoin = async () => {
+    if (!selectedBall || !userEmail) return;
+
+      try {
+        const res = await fetch(
+        `${serverUrl}/api/games/join?email=${encodeURIComponent(userEmail)}&ball=${selectedBall}`,
+        {
+            method: "GET",
+            credentials: "include",
+        }
+        );
+
+      if (!res.ok) throw new Error("Failed to join race");
+
+      const result = await res.json();
+      console.log("Joined successfully:", result);
+      alert("Successfully joined the race!");
+      onClose(); // Close modal after join
+    } catch (err) {
+      console.error(err);
+      alert("Error joining race");
+    }
+  };
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm z-50">
       <div className="bg-[#1a1a1a] w-[90%] sm:w-[420px] rounded-2xl shadow-xl overflow-hidden border border-gray-800">
@@ -44,7 +88,7 @@ const JoinRaceModal: React.FC<JoinRaceModalProps> = ({ onClose }) => {
             <h2 className="text-white font-semibold text-lg">Join race</h2>
             <p className="text-gray-400 text-xs">
               Select one ball (1–15) for race{" "}
-              18092501
+              {gameNumber}
               Entry closes 30 seconds before start time.
             </p>
           </div>
@@ -66,7 +110,7 @@ const JoinRaceModal: React.FC<JoinRaceModalProps> = ({ onClose }) => {
 
         {/* Right side */}
         <div className="flex items-center">
-          <span className="text-indigo-400 font-semibold text-base">Eliminator</span>
+          <span className="text-indigo-400 font-semibold text-base">{gameType}</span>
         </div>
         </div>
  
@@ -109,7 +153,8 @@ const JoinRaceModal: React.FC<JoinRaceModalProps> = ({ onClose }) => {
                 ? "bg-indigo-600 hover:bg-indigo-700"
                 : "bg-gray-700 cursor-not-allowed"
               }`}
-            disabled={!selectedBall}
+            disabled={!selectedBall || !userEmail}
+            onClick={handleJoin}
           >
             Join
           </button>
