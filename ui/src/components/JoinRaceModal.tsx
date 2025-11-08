@@ -68,16 +68,34 @@ const JoinRaceModal: React.FC<JoinRaceModalProps> = ({ onClose, gameType, gameNu
         }
         );
 
-      if (!res.ok) throw new Error("Failed to join race");
-
+if (!res.ok) {
+        let errorDetail = "Failed to join race";
+        
+        // Attempt to parse the response body, which usually contains the error details (like the FastAPI 'detail')
+        try {
+            const errorBody = await res.json();
+            // Assuming FastAPI error format { "detail": "User already joined the game" }
+            if (errorBody && errorBody.detail) {
+                errorDetail = errorBody.detail;
+            } else {
+                // Fallback for non-JSON or unexpected structure
+                errorDetail = `Server returned status ${res.status}`;
+            }
+        } catch (e) {
+            // Handle case where response is not JSON (e.g., plain text 500 error)
+            errorDetail = `Request failed with status ${res.status}`;
+        }
+        
+        // Throw an error that contains the specific error message
+        throw new Error(errorDetail); 
+    }
       const result = await res.json();
       console.log("Joined successfully:", result);
       alert("Successfully joined the race!");
       onClose(); // Close modal after join
     } catch (err) {
-      console.error(err);
-      alert("Error joining race");
-    }
+        alert("Error Joining the Race")
+}
   };
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm z-50">
@@ -88,8 +106,8 @@ const JoinRaceModal: React.FC<JoinRaceModalProps> = ({ onClose, gameType, gameNu
             <h2 className="text-white font-semibold text-lg">Join race</h2>
             <p className="text-gray-400 text-xs">
               Select one ball (1–15) for race{" "}
-              {gameNumber}
-              Entry closes 30 seconds before start time.
+              {gameNumber}{" "}
+               Entry closes 30 seconds before start time.
             </p>
           </div>
           <button

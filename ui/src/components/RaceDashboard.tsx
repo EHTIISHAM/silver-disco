@@ -143,12 +143,7 @@ useEffect(() => {
 
         if (Array.isArray(data.games)) {
         const gamesList = data.games;
-
-        const ongoingGame = gamesList.find((g) => g.status === "Ongoing");
-        if (ongoingGame) {
-            setGames([ongoingGame]);
-        } else {
-            const upcomingGames = gamesList
+        const upcomingGames = gamesList
             .filter((g) => g.status === "Not Started" && typeof g.createdAt === "number")
             .sort((a, b) => a.createdAt! - b.createdAt!);
 
@@ -159,7 +154,7 @@ useEffect(() => {
                 setGames([]);
             
             }
-        }
+        
         }
         else{
             console.error("data fetching good error in filtering")

@@ -130,16 +130,28 @@ async def scheduler():
             )
             print(f"🚀 Game {game_id} is now Ongoing")
 
-            # 5️⃣ Wait for the game duration (you can customize actual duration)
             game_duration = game["timerTillNextGame"] * 60
-            await asyncio.sleep(game_duration)
+            interval = 5  # check every 5 seconds if game was force-finished
 
-            # 6️⃣ Mark as Finished
-            await db.games.update_one(
-                {"_id": game_id},
-                {"$set": {"status": "Finished"}}
-            )
-            print(f"🏁 Game {game_id} is now Finished")
+            elapsed = 0
+            while elapsed < game_duration:
+                await asyncio.sleep(interval)
+                elapsed += interval
+
+                # Check if game was force-finished externally
+                ongoing = await db.games.find_one({"_id": game_id, "status": "Ongoing"})
+                if not ongoing:
+                    print(f"⚡ Game {game_id} was force finished. Moving on.")
+                    break
+
+            # 5️⃣ If still ongoing, mark as finished normally
+            ongoing = await db.games.find_one({"_id": game_id, "status": "Ongoing"})
+            if ongoing:
+                await db.games.update_one(
+                    {"_id": game_id},
+                    {"$set": {"status": "Finished", "endedAt": int(datetime.utcnow().timestamp() * 1000)}}
+                )
+                print(f"🏁 Game {game_id} is now Finished")
 
             # 7️⃣ Move current_start forward for next game
             current_start = start_time + timedelta(minutes=game["timerTillNextGame"])
@@ -161,6 +173,8 @@ async def create_session(username: str) -> str:
 
 async def fetch_prize(prize_id: str) -> Optional[Dict[str, Any]]:
     prize = await db.prizes.find_one({"_id": prize_id})
+    if prize == None:
+        print(f"Prize with id {prize_id} not found.")
     return prize['title'] if prize else None
 
 async def create_points_only_prize() -> str:
@@ -291,12 +305,13 @@ async def dashboard(request: Request):
     
     prizes = await db.prizes.find().to_list(length=1000)
     next_game = await db.games.find_one({"status": "Not Started"}, sort=[("createdAt", 1)])
-    
+    current_game = await db.games.find_one({"status": "Ongoing"}, sort=[("createdAt", 1)])
     context = {
         "request": request,
         "username": username,
         "prizes": prizes,
         "nextGame": next_game,
+        "currentGame": current_game,
     }
     return templates.TemplateResponse("dashboard.html", context)
 
@@ -336,6 +351,7 @@ async def api_new_game(
         prize = await create_points_only_prize()
     
     game_number = await get_next_sequence("gameNumber")
+    prize_title = await fetch_prize(prize) if prize else "Points Only"
     # game_number is game_number+ddmmyyyy
     game_number = f"{game_number}{datetime.utcnow().strftime('%d%m%Y')}"
     # Convert timer to minutes for storage
@@ -348,7 +364,7 @@ async def api_new_game(
         "numberOfBalls": 12,
         "bonusBalls": 0,
         "prizeId": prize,
-        "prizeTitle": await fetch_prize(prize) if prize else "Points Only",
+        "prizeTitle": prize_title,
         "timerTillNextGame": timer_minutes,
         "participants": [],
         "kicked": [],
@@ -361,17 +377,17 @@ async def api_new_game(
     return RedirectResponse("/dashboard", status_code=303)
 
 
-@app.post("/api/games/begin")
-async def api_begin_races(request: Request):
+@app.post("/api/games/forcefinish")
+async def api_force_finish_game(request: Request):
     await require_login(request)
-    # find next game and set it ongoing
-    next_game = await db.games.find_one({"status": "Not Started"}, sort=[("createdAt", 1)])
-    if not next_game:
-        raise HTTPException(400, "No next game ready")
-    await db.games.update_one({"_id": next_game["_id"]}, {"$set": {"status": "Ongoing", "startedAt": int(datetime.utcnow().timestamp()*1000)}})
-    # optionally create initial race document
-    await db.races.insert_one({"gameId": next_game["_id"], "raceNumber": 1, "winners": [], "createdAt": int(datetime.utcnow().timestamp()*1000)})
-    return RedirectResponse("/dashboard", status_code=303)
+    ongoing_game = await db.games.find_one({"status": "Ongoing"})
+    if not ongoing_game:
+        raise HTTPException(status_code=404, detail="No ongoing game found")
+    await db.games.update_one(
+        {"_id": ongoing_game["_id"]},
+        {"$set": {"status": "Finished", "endedAt": int(datetime.utcnow().timestamp() * 1000)}}
+    )
+    return RedirectResponse(url="/dashboard", status_code=303)
 
 @app.post("/api/games/update")
 async def api_update_current_game(request: Request,
@@ -411,6 +427,22 @@ async def api_update_current_game(request: Request,
         await db.games.update_one({"_id": game_id}, {"$set": update_ops})
 
     return RedirectResponse("/dashboard", status_code=303)
+
+
+@app.get("/api/games/status")
+async def get_game_status():
+    current_game = await db.games.find_one({"status": "Ongoing"})
+    next_game = await db.games.find_one({"status": "Not Started"})
+    return JSONResponse({
+        "currentGame": {
+            "gameNumber": current_game.get("gameNumber") if current_game else None,
+            "status": current_game.get("status") if current_game else None
+        } if current_game else None,
+        "nextGame": {
+            "gameNumber": next_game.get("gameNumber") if next_game else None,
+            "status": next_game.get("status") if next_game else None
+        } if next_game else None
+    })
 
 @app.post("/api/prizes/new")
 async def api_new_prize(request: Request, title: str = Form(...), description: str = Form("")):

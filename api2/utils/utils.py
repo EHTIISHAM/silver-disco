@@ -48,7 +48,7 @@ async def fetch_games_from_db():
         raise HTTPException(status_code=500, detail="Internal server error")
 
 #using email and ball to join the latest not started game
-@router.post("/api/games/join")
+@router.get("/api/games/join")
 async def join_latest_game(email: str, ball: str):
     """
     Join the latest not started game using email and ball.
@@ -60,6 +60,11 @@ async def join_latest_game(email: str, ball: str):
 
         if not latest_game:
             raise HTTPException(status_code=404, detail="No not started game found")
+
+        # Check if user already joined
+        for participant in latest_game.get("participants", []):
+            if participant["email"] == email:
+                raise HTTPException(status_code=400, detail="User already joined the game")
 
         # Add user to the game
         await db.games.update_one({"_id": latest_game["_id"]}, {

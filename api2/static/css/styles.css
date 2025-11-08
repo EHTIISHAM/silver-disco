@@ -286,6 +286,21 @@ button:disabled {
     background-color: #dc2626;
 }
 
+.danger-btn {
+  background-color: #b91c1c; /* red */
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.danger-btn:hover {
+  background-color: #dc2626;
+}
+
 /* ---------------------------------- */
 /* 5. Tables                          */
 /* ---------------------------------- */

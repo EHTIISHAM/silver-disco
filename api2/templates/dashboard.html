@@ -25,11 +25,32 @@
 
     <div class="content-rows">
       <fieldset style="border:none;">
+        <div class="flex-heading">
+            <h3>OnGoing Game</h3>
+            <span>#{{ currentGame.gameNumber if currentGame else "No Game" }}</span>
+              {% if currentGame %}
+            <form method="post" action="/api/games/forcefinish" style="display:inline;">
+            <button 
+                type="submit" 
+                class="danger-btn"
+                onclick="return confirm('Are you sure you want to force finish the current game?');"
+            >
+                Force Finish
+            </button>
+            </form>
+        {% endif %}
+        </div>
         <form method="post" action="/api/games/new" class="content-column">
           <div class="flex-heading">
             <h3>Next Game</h3>
-            <span>#{{ nextGame.gameNumber if nextGame else "" }}</span>
-            <button type="submit">CREATE GAME</button>
+            <span>#{{ nextGame.gameNumber if nextGame else "No Next Game" }}</span>
+            <button 
+            type="submit" 
+            class="create-btn"
+            {% if nextGame %}disabled style="opacity:0.5; cursor:not-allowed;"{% endif %}
+            >
+            CREATE GAME
+            </button>
           </div>
 
           <div class="cards-row">
@@ -129,5 +150,66 @@
     </section>
 
   </main>
+
+<script>
+  async function refreshGameStatus() {
+    try {
+      const response = await fetch('/api/games/status');
+      if (!response.ok) return;
+      const data = await response.json();
+
+        const ongoingContainer = document.querySelector('.flex-heading');
+        const ongoingSpan = ongoingContainer.querySelector('span');
+        const existingForm = ongoingContainer.querySelector('form');
+
+        if (data.currentGame) {
+        ongoingSpan.textContent = `#${data.currentGame.gameNumber}`;
+
+        // Add Force Finish button if it doesn't exist
+        if (!existingForm) {
+            const form = document.createElement('form');
+            form.method = 'post';
+            form.action = '/api/games/forcefinish';
+            form.style.display = 'inline';
+
+            const btn = document.createElement('button');
+            btn.type = 'submit';
+            btn.className = 'danger-btn';
+            btn.textContent = 'Force Finish';
+            btn.onclick = () => confirm('Are you sure you want to force finish the current game?');
+
+            form.appendChild(btn);
+            ongoingContainer.appendChild(form);
+        }
+        } else {
+        ongoingSpan.textContent = 'No Game';
+        // Remove Force Finish button if it exists
+        if (existingForm) existingForm.remove();
+        }
+
+      // Update next game
+        const nextGameSpan = document.querySelectorAll('.flex-heading span')[1];
+        const createBtn = document.querySelector('.create-btn');
+      if (data.nextGame) {
+        nextGameSpan.textContent = `#${data.nextGame.gameNumber}`;
+        createBtn.disabled = true;
+        createBtn.style.opacity = "0.5";
+        createBtn.style.cursor = "not-allowed";
+      } else {
+        nextGameSpan.textContent = "No Next Game";
+        createBtn.disabled = false;
+        createBtn.style.opacity = "1";
+        createBtn.style.cursor = "pointer";
+      }
+
+    } catch (err) {
+      console.error('Error refreshing game status:', err);
+    }
+  }
+
+  // Run every 5 seconds
+  setInterval(refreshGameStatus, 5000);
+  document.addEventListener("DOMContentLoaded", refreshGameStatus);
+</script>
 </body>
 </html>
