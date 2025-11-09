@@ -106,8 +106,7 @@ if (!res.ok) {
             <h2 className="text-white font-semibold text-lg">Join race</h2>
             <p className="text-gray-400 text-xs">
               Select one ball (1–15) for race{" "}
-              {gameNumber}{" "}
-               Entry closes 30 seconds before start time.
+              {gameNumber}
             </p>
           </div>
           <button
