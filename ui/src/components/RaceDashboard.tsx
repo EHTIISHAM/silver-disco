@@ -70,10 +70,12 @@ const RaceDashboard: React.FC = () => {
   const [recentRaces, setRecentRaces] = useState<any[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [remaining, setRemaining] = useState<number>(0);
-  const [participants, setParticipants] = useState<number>(0);
   const currentGameType = games[0]?.gameType || "----";
   const currentGameNumber = games[0]?.gameNumber || "----";
   const currentRaceTime = games[0]?.timerTillNextGame || 0;
+  let participantsCount = games[0]?.participants?.length || 0;
+  if (currentGameNumber === "----") participantsCount = 0;
+  const [participants, setParticipants] = useState<number>(participantsCount);
   const createdAt = games[0]?.createdAt || 0;
   const starttimeofgame = getNextRaceStartTime(createdAt, currentRaceTime);
   const gamestarttime = starttimeofgame.split(":").slice(0,2).join(":") || "xx:xx";
@@ -116,7 +118,6 @@ const RaceDashboard: React.FC = () => {
 useEffect(() => { fetchGames(); }, []);
   const fetchGames = async () => {
     try {
-      console.log("🎮 Fetching game data...");
       const res = await fetch(`${import.meta.env.VITE_PY_SERVER_URL}/api/games/fetch`);
 
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
@@ -173,25 +174,33 @@ useEffect(() => {
     return () => clearInterval(timer);
   }, [games, createdAt, currentRaceTime]);
 
-  // ✅ Update participants every 10 seconds
-  useEffect(() => {
-    const pInterval = setInterval(() => {
-    const fetchParticipants = async () => {
-    if (!games) return;
+useEffect(() => {
+  if (games?.[0]) {
+    setParticipants(games[0].participants?.length || 0);
+  }
+}, [games]);
+
+useEffect(() => {
+  if (!currentGameNumber) return;
+
+  const fetchParticipants = async () => {
     try {
       const res = await fetch(`${import.meta.env.VITE_PY_SERVER_URL}/api/games/fetch`);
       if (!res.ok) return;
       const data: GameResponse = await res.json();
-      const updatedGame = data.games?.find((g) => g.gameNumber === currentGameNumber);
+      const updatedGame = data.games?.find(
+        (g) => g.gameNumber === currentGameNumber
+      );
       if (updatedGame) setParticipants(updatedGame.participants?.length || 0);
     } catch (err) {
-      console.error("⚠ Error updating participants");
+      console.error("⚠ Error updating participants", err);
     }
   };
-      fetchParticipants();
-    }, 10000);
-    return () => clearInterval(pInterval);
-  }, [games,currentGameNumber]);
+
+  fetchParticipants();
+  const pInterval = setInterval(fetchParticipants, 10000);
+  return () => clearInterval(pInterval);
+}, [currentGameNumber]);
 
   if (!games)
     return (

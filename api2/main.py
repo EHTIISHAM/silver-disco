@@ -92,7 +92,6 @@ async def scheduler():
         games = await games_cursor.to_list(length=None)
 
         if not games:
-            print("⏸️ No upcoming games found — checking again in 30s.")
             await asyncio.sleep(30)
             continue
 
@@ -172,7 +171,7 @@ async def create_session(username: str) -> str:
     return sid
 
 async def fetch_prize(prize_id: str) -> Optional[Dict[str, Any]]:
-    prize = await db.prizes.find_one({"_id": prize_id})
+    prize = await db.prizes.find_one({"_id": ObjectId(prize_id)})
     if prize == None:
         print(f"Prize with id {prize_id} not found.")
     return prize['title'] if prize else None
@@ -465,7 +464,7 @@ async def api_get_all_users(request: Request):
 @app.post("/api/prizes/delete")
 async def api_delete_prize(request: Request, prize_id: str = Form(...)):
     await require_login(request)
-    await db.prizes.delete_one({"_id": prize_id})
+    await db.prizes.delete_one({"_id": ObjectId(prize_id)})
     return RedirectResponse("/dashboard", status_code=303)
 
 # Add more endpoints as needed (past winners listing, deleting games, etc.)
