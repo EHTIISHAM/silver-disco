@@ -18,29 +18,23 @@ function getNextRaceStartTime(createdAt: number, timerTillNextRace?: number): st
   const minutes = timerTillNextRace || 0;
   const startDate = new Date(createdAt + minutes * 60 * 1000);
 
-  // Format to HH:MM (24-hour)
+  // Format HH:MM:SS to keep precision
   const hours = startDate.getHours().toString().padStart(2, "0");
   const mins = startDate.getMinutes().toString().padStart(2, "0");
+  const secs = startDate.getSeconds().toString().padStart(2, "0");
 
-  return `${hours}:${mins}`;
+  return `${hours}:${mins}:${secs}`;
 }
 
-function getRemainingSeconds(starttimeofgame:string) {
+function getRemainingSeconds(starttimeofgame: string) {
   const now = new Date();
-
-  // Parse the start time string (HH:mm)
-  const [hours, minutes] = starttimeofgame.split(':').map(Number);
-
-  // Create a Date object for today’s start time
+  const [hours, minutes, seconds = 0] = starttimeofgame.split(':').map(Number);
   const startTime = new Date();
-  startTime.setHours(hours, minutes, 0, 0);
-
-  // Calculate remaining time in seconds
-  const diffMs: number = startTime.getTime() - now.getTime(); // Corrected line
-  const remainingSeconds = Math.max(0, Math.floor(diffMs / 1000));
-
-  return remainingSeconds;
+  startTime.setHours(hours, minutes, seconds, 0);
+  const diffMs = startTime.getTime() - now.getTime();
+  return Math.max(0, Math.floor(diffMs / 1000));
 }
+
 interface Game {
   status: "Not Started" | "Ongoing" | "Finished";
   gameType: string;
@@ -71,20 +65,18 @@ const ProgressBar: React.FC<{ time: number; maxTime: number }> = ({ time, maxTim
   );
 };
 
-
 const RaceDashboard: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [recentRaces, setRecentRaces] = useState<any[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [remaining, setRemaining] = useState<number>(0);
-  const participantsCount = games[0]?.participants?.length || 0;
-  const [participants, setParticipants] = useState<number>(participantsCount);
+  const [participants, setParticipants] = useState<number>(0);
   const currentGameType = games[0]?.gameType || "----";
   const currentGameNumber = games[0]?.gameNumber || "----";
   const currentRaceTime = games[0]?.timerTillNextGame || 0;
   const createdAt = games[0]?.createdAt || 0;
   const starttimeofgame = getNextRaceStartTime(createdAt, currentRaceTime);
-  const gamestarttime = starttimeofgame || "xx:xx";
+  const gamestarttime = starttimeofgame.split(":").slice(0,2).join(":") || "xx:xx";
   const currentEntry = games[0]?.entry || "free";
   const currentgift = games[0]?.prizeTitle || "Points Only";
   
@@ -154,9 +146,13 @@ useEffect(() => { fetchGames(); }, []);
     }
   };
 
-  useEffect(() => {
-    fetchGames();
-  }, []);
+useEffect(() => {
+  const interval = setInterval(() => {
+    fetchGames(); // will update state if a new game appears
+  }, 5000); // every 5 seconds
+
+  return () => clearInterval(interval);
+}, []);
   useEffect(() => {
     if (!games.length) return;
     const startTime = getNextRaceStartTime(createdAt, currentRaceTime);
@@ -226,7 +222,7 @@ useEffect(() => { fetchGames(); }, []);
     <ProgressBar time={remaining} maxTime={maxTimeSec} />
 
     {/* Info grid */}
-    <div className="grid grid-cols-2 gap-2 text-sm mb-4">
+    <div className="grid grid-cols-2 gap-2 text-sm mb-4 p-2">
 
       {/* 🕓 Start Time */}
       <div className="bg-[#1a1a1a] p-2 rounded-lg flex flex-col items-start text-left">
