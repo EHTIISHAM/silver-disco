@@ -14,12 +14,6 @@ import b3 from "../assets/5balls/03.png";
 import b4 from "../assets/5balls/04.png";
 import b5 from "../assets/5balls/05.png";
 
-// ✅ Dynamic ProgressBar Component (added inline)
-interface ProgressBarProps {
-  time: number; // e.g. 1, 2, 3, 5, 10
-  maxTime?: number; // default 10
-}
-
 function getNextRaceStartTime(createdAt: number, timerTillNextRace?: number): string {
   const minutes = timerTillNextRace || 0;
   const startDate = new Date(createdAt + minutes * 60 * 1000);
@@ -65,19 +59,14 @@ interface GameResponse {
 
 
 
-const ProgressBar: React.FC<ProgressBarProps> = ({ time = 0, maxTime = 10 }) => {
+const ProgressBar: React.FC<{ time: number; maxTime: number }> = ({ time, maxTime }) => {
   const percentage = Math.min((time / maxTime) * 100, 100);
-
   return (
-    <div className="w-full">
-      <div className="flex items-center justify-between mb-2">
-        <div className="w-full bg-gray-800 rounded-full h-2 mr-2">
-          <div
-            className="bg-[#8a6fec] h-2 rounded-full transition-all duration-500 ease-in-out"
-            style={{ width: `${percentage}%` }}
-          ></div>
-        </div>
-      </div>
+    <div className="w-full bg-gray-800 rounded-full h-2">
+      <div
+        className="bg-[#8a6fec] h-2 rounded-full transition-all duration-500 ease-in-out"
+        style={{ width: `${percentage}%` }}
+      ></div>
     </div>
   );
 };
@@ -87,14 +76,15 @@ const RaceDashboard: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [recentRaces, setRecentRaces] = useState<any[]>([]);
   const [games, setGames] = useState<Game[]>([]);
+  const [remaining, setRemaining] = useState<number>(0);
+  const participantsCount = games[0]?.participants?.length || 0;
+  const [participants, setParticipants] = useState<number>(participantsCount);
   const currentGameType = games[0]?.gameType || "----";
   const currentGameNumber = games[0]?.gameNumber || "----";
   const currentRaceTime = games[0]?.timerTillNextGame || 0;
   const createdAt = games[0]?.createdAt || 0;
   const starttimeofgame = getNextRaceStartTime(createdAt, currentRaceTime);
-  const remianingTime = getRemainingSeconds(starttimeofgame)
   const gamestarttime = starttimeofgame || "xx:xx";
-  const participantsCount = games[0]?.participants?.length || 0;
   const currentEntry = games[0]?.entry || "free";
   const currentgift = games[0]?.prizeTitle || "Points Only";
   
@@ -131,7 +121,7 @@ const RaceDashboard: React.FC = () => {
   fetchRecentRaces();
 }, []);
 
-useEffect(() => {
+useEffect(() => { fetchGames(); }, []);
   const fetchGames = async () => {
     try {
       console.log("🎮 Fetching game data...");
@@ -164,9 +154,57 @@ useEffect(() => {
     }
   };
 
-  fetchGames();
-}, []);
+  useEffect(() => {
+    fetchGames();
+  }, []);
+  useEffect(() => {
+    if (!games.length) return;
+    const startTime = getNextRaceStartTime(createdAt, currentRaceTime);
+    //const totalSeconds = (currentRaceTime || 0) * 60;
 
+    // Update remaining every second
+    const timer = setInterval(() => {
+      const remain = getRemainingSeconds(startTime);
+      setRemaining(remain);
+
+      // When timer ends, auto reload new game
+      if (remain <= 0) {
+        clearInterval(timer);
+        fetchGames();
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [games, createdAt, currentRaceTime]);
+
+  // ✅ Update participants every 10 seconds
+  useEffect(() => {
+    const pInterval = setInterval(() => {
+    const fetchParticipants = async () => {
+    if (!games) return;
+    try {
+      const res = await fetch(`${import.meta.env.VITE_PY_SERVER_URL}/api/games/fetch`);
+      if (!res.ok) return;
+      const data: GameResponse = await res.json();
+      const updatedGame = data.games?.find((g) => g.gameNumber === currentGameNumber);
+      if (updatedGame) setParticipants(updatedGame.participants?.length || 0);
+    } catch (err) {
+      console.error("⚠ Error updating participants");
+    }
+  };
+      fetchParticipants();
+    }, 10000);
+    return () => clearInterval(pInterval);
+  }, [games,currentGameNumber]);
+
+  if (!games)
+    return (
+      <div className="text-white text-center py-10">
+        <p>Loading next race...</p>
+      </div>
+    );
+
+  const maxTimeSec = (currentRaceTime || 0) * 60;
 
   return (
     <div className="w-full flex justify-center px-3 sm:px-6 lg:px-10 py-6">
@@ -185,8 +223,7 @@ useEffect(() => {
 
 
     {/* ✅ Dynamic Progress Bar */}
-    <ProgressBar time={remianingTime} maxTime={currentRaceTime} />
-
+    <ProgressBar time={remaining} maxTime={maxTimeSec} />
 
     {/* Info grid */}
     <div className="grid grid-cols-2 gap-2 text-sm mb-4">
@@ -213,7 +250,7 @@ useEffect(() => {
             className="w-5 h-5 rounded-full object-cover"
           />
           <span className="text-base font-semibold text-white">
-            {participantsCount}
+            {participants}
           </span>
 
         </div>
