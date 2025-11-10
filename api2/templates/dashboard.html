@@ -95,10 +95,10 @@
               <div class="form-group">
                 <label>Prize:</label>
                 <select name="prize" required>
-                  <option value="Points Only">Points Only</option>
                   {% for p in prizes %}
                     <option value="{{ p._id }}">{{ p.title }}</option>
                   {% endfor %}
+                  <option value="Points Only">Points Only</option>
                 </select>
               </div>
             </div>

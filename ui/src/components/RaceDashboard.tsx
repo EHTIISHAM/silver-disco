@@ -217,7 +217,7 @@ useEffect(() => {
         <div className="bg-[#121212] rounded-2xl p-4 shadow border border-gray-800 flex flex-col justify-between">
   <div>
     <h2 className="text-sm text-white-600 mb-1">
-      Current race{" "}
+      Next race{" "}
       <span className="text-indigo-400">
         ({currentGameType ? currentGameType : "null"})
       </span>
@@ -297,7 +297,7 @@ useEffect(() => {
     className="w-full bg-[#121212] text-white font-semibold py-2 rounded-3xl border border-[#522cab] hover:border-blue-600 hover:bg-[#0a0a0a] transition"
     onClick={() => setShowModal(true)}
   >
-    Join next match
+    Join next Race
   </button>
 </div>
 
