@@ -1,0 +1,5 @@
+{
+    "model_path": "ball_model.pt",
+    "camera_index": 0,
+    "api_url": "http://localhost:5000/submit_rankings"
+}
