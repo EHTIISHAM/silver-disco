@@ -29,16 +29,17 @@ export async function getMe(req: Request, res: Response): Promise<void> {
       twitch: !!user.twitchId || user.connectedAccounts?.twitch || false,
     };
 
-    res.json({
-      user: {
-        username: user.username,
-        email: user.email,
-        pfp: user.pfp,
-        points: user.points || 0,
-        numberOfWins: user.numberOfWins || 0,
-        connectedAccounts,
-      },
-    });
+        res.json({
+        user: {
+            _id: user._id,
+            username: user.username,
+            email: user.email,
+            pfp: user.pfp,
+            points: user.points || 0,
+            numberOfWins: user.numberOfWins || 0,
+            connectedAccounts,
+        },
+        });
   } catch (err) {
     console.error("❌ Error in /me route:", err);
     res.status(500).json({ msg: "Server error" });

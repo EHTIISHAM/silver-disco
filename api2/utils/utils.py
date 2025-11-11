@@ -1,5 +1,5 @@
 import os
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
 from datetime import datetime
@@ -49,36 +49,60 @@ async def fetch_games_from_db():
 
 #using email and ball to join the latest not started game
 @router.get("/api/games/join")
-async def join_latest_game(email: str, ball: str):
+async def join_latest_game(
+    userId: str = Query(None, description="MongoDB _id of user"),
+    email: str = Query(None, description="Fallback email if userId not provided"),
+    ball: str = Query(..., description="Ball number")
+):
     """
-    Join the latest not started game using email and ball.
+    Join the latest not started game using userId (preferred) or email and ball.
     """
     try:
-        latest_game = await db.games.find_one({
-            "status": "Not Started"
-        }, sort=[("createdAt", -1)])
-
+        # 1️⃣ Fetch the latest "Not Started" game
+        latest_game = await db.games.find_one({"status": "Not Started"}, sort=[("createdAt", -1)])
         if not latest_game:
             raise HTTPException(status_code=404, detail="No not started game found")
 
-        # Check if user already joined
+        # 2️⃣ Fetch user (by userId or email)
+        user = None
+        if userId:
+            user = await db.users.find_one({"_id": ObjectId(userId)})
+        elif email:
+            user = await db.users.find_one({"email": email})
+
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # 3️⃣ Check if user already joined
         for participant in latest_game.get("participants", []):
-            if participant["email"] == email:
+            if (
+                (userId and participant.get("userId") == str(user["_id"])) or
+                (email and participant.get("email") == user.get("email"))
+            ):
                 raise HTTPException(status_code=400, detail="User already joined the game")
 
-        # Add user to the game
-        await db.games.update_one({"_id": latest_game["_id"]}, {
-            "$addToSet": {
-                "participants": {
-                    "email": email,
-                    "ball": ball
-                }
-            }
-        })
-        latest_game["_id"] = str(latest_game["_id"])
+        # 4️⃣ Add user to participants
+        participant_data = {
+            "userId": str(user["_id"]),
+            "username": user.get("username", "Unknown"),
+            "pfp": user.get("pfp", ""),
+            "ball": ball
+        }
 
+        # Keep backward compatibility (include email if exists)
+        if user.get("email"):
+            participant_data["email"] = user["email"]
+
+        await db.games.update_one(
+            {"_id": latest_game["_id"]},
+            {"$addToSet": {"participants": participant_data}}
+        )
+
+        latest_game["_id"] = str(latest_game["_id"])
         return {"message": "Successfully joined the game", "game": latest_game}
 
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"❌ Error joining game: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")

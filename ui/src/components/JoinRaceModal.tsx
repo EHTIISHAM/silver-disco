@@ -36,32 +36,32 @@ interface JoinRaceModalProps {
 
 const JoinRaceModal: React.FC<JoinRaceModalProps> = ({ onClose, gameType, gameNumber }) => {
   const [selectedBall, setSelectedBall] = useState<number | null>(null);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const serverUrl = import.meta.env.VITE_PY_SERVER_URL;
   const serverurl1 = import.meta.env.VITE_SERVER_URL
 
   // Fetch user email on mount
-  useEffect(() => {
+    useEffect(() => {
     const fetchUser = async () => {
-      try {
+        try {
         const res = await fetch(`${serverurl1}/api/user/me`, {
-          credentials: "include",
+            credentials: "include",
         });
         const data = await res.json();
-        if (data?.user?.email) setUserEmail(data.user.email);
-      } catch (err) {
+        if (data?.user?._id) setUserId(data.user._id);
+        } catch (err) {
         console.error("Failed to fetch user:", err);
-      }
+        }
     };
     fetchUser();
-  }, [serverurl1]);
+    }, [serverurl1]);
 
-  const handleJoin = async () => {
-    if (!selectedBall || !userEmail) return;
+    const handleJoin = async () => {
+    if (!selectedBall || !userId) return;
 
-      try {
+    try {
         const res = await fetch(
-        `${serverUrl}/api/games/join?email=${encodeURIComponent(userEmail)}&ball=${selectedBall}`,
+        `${serverUrl}/api/games/join?userId=${userId}&ball=${selectedBall}`,
         {
             method: "GET",
             credentials: "include",
@@ -170,7 +170,7 @@ if (!res.ok) {
                 ? "bg-indigo-600 hover:bg-indigo-700"
                 : "bg-gray-700 cursor-not-allowed"
               }`}
-            disabled={!selectedBall || !userEmail}
+            disabled={!selectedBall || !userId}
             onClick={handleJoin}
           >
             Join
