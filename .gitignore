@@ -1,6 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
+/pinballrace
 /api/node_modules
 /ui/node_modules
 /api2/__pycache__

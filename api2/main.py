@@ -468,7 +468,12 @@ async def api_delete_prize(request: Request, prize_id: str = Form(...)):
     return RedirectResponse("/dashboard", status_code=303)
 
 # Add more endpoints as needed (past winners listing, deleting games, etc.)
-
+@app.post("/api/submit_rankings")
+async def submit_rankings(rankings: Dict[str, int]):
+    # This endpoint can be used to receive ball rankings from the detection script
+    # For now, we will just log them and return a success response
+    print("Received ball rankings:", rankings)
+    return {"status": "success", "message": "Rankings received"}
 # ---------- Startup: ensure counters exist ----------
 @app.on_event("startup")
 async def startup_event():
