@@ -29,6 +29,21 @@ def save_config(config):
     with open(CONFIG_FILE, "w") as f:
         json.dump(config, f, indent=4)
 
+def rank_balls_left_to_right(ball_detections):
+    """
+    Takes a list of ball detections and returns a dictionary
+    ranking them from left (1st) to right (last) based on the x-coordinate.
+    """
+    if not ball_detections:
+        return {}
+
+    # Sort detections by leftmost x1 (ascending)
+    sorted_balls = sorted(ball_detections, key=lambda b: b["box"]["x1"])
+
+    # Create ranking dictionary
+    ball_rankings = {ball["name"]: idx + 1 for idx, ball in enumerate(sorted_balls)}
+
+    return ball_rankings
 # ---------------- MAIN DETECTION LOGIC ----------------
 class DetectorThread(threading.Thread):
     def __init__(self, config, log_callback, stop_event):
@@ -59,14 +74,16 @@ class DetectorThread(threading.Thread):
 
         self.log("Detection started.")
         ball_rankings = {}
-
+        initial_ball_count = 0
+        time_tag = False
+        start_time = None
         while not self.stop_event.is_set():
             ret, frame = cap.read()
             if not ret:
                 self.log("Camera frame not received.")
                 break
 
-            results = model(frame)
+            results = model(frame, conf=0.5)
             annotated_frame = results[0].plot()
 
             # Show frame
@@ -91,18 +108,39 @@ class DetectorThread(threading.Thread):
             else:
                 self.log("No balls detected")
 
-            ball_rankings = {
-                ball["name"]: idx + 1 for idx, ball in enumerate(ball_detections[:10])
-            }
+            ball_rankings = rank_balls_left_to_right(ball_detections)
+            current_count = len(ball_rankings)
 
-            if len(ball_rankings) >= 10:
+            # Timer logic
+            if current_count > 0:
+                # Case 1: First detection OR new ball(s) detected — reset timer
+                if current_count > initial_ball_count or start_time is None:
+                    initial_ball_count = current_count
+                    start_time = time.time()
+                    time_tag = False  # reset timeout flag
+                    print("Ball(s) detected — timer started/reset.")
+                
+                # Case 2: Same count — check for timeout
+                elif current_count == initial_ball_count:
+                    elapsed = time.time() - start_time
+                    if elapsed > 5:
+                        print("Timeout reached for current detections.")
+                        time_tag = True
+            else:
+                # No balls detected — reset everything
+                start_time = None
+                initial_ball_count = 0
+                time_tag = False
+            if len(ball_rankings) >= 10 or time_tag == True:
                 self.log(f"🏁 Ball Rankings ready: {ball_rankings}")
+                print(ball_rankings)
+                cv2.imwrite("detected frame.jpg", annotated_frame)
                 try:
                     response = requests.post(self.config["api_url"], json=ball_rankings)
                     self.log(f"Sent to API — Status {response.status_code}")
                 except Exception as e:
                     self.log(f"API Error: {e}")
-                break
+                
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
