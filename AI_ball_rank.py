@@ -53,6 +53,8 @@ class DetectorThread(threading.Thread):
         self.stop_event = stop_event
 
     def run(self):
+        new_w, new_h = 1280, 720
+
         try:
             self.log("Loading YOLO model...")
             model = ultralytics.YOLO(self.config["model_path"])
@@ -82,12 +84,29 @@ class DetectorThread(threading.Thread):
             if not ret:
                 self.log("Camera frame not received.")
                 break
-
+            h, w, _ = frame.shape
+            start_x = max((w - new_w) // 2, 0)
+            start_y = max((h - new_h) // 2, 0)
+            frame = frame[start_y:start_y + new_h, start_x:start_x + new_w]
             results = model(frame, conf=0.5)
-            annotated_frame = results[0].plot()
+            self.log(frame.shape)
+            boxes = results[0].boxes.xywh.cpu().numpy() if results[0].boxes is not None else []
+            names = results[0].names
+            cls = results[0].boxes.cls.cpu().numpy().astype(int) if results[0].boxes is not None else []
+            confs = results[0].boxes.conf.cpu().numpy() if results[0].boxes is not None else []
 
+            annotated_frame = frame.copy()
+            for (x_c, y_c, bw, bh), c, conf in zip(boxes, cls, confs):
+                x1 = int(x_c - bw / 2)
+                y1 = int(y_c - bh / 2)
+                x2 = int(x_c + bw / 2)
+                y2 = int(y_c + bh / 2)
+                label = f"{names[c]} {conf:.2f}"
+                cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv2.putText(annotated_frame, label, (x1, y1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
             # Show frame
-            cv2.imshow("YOLOv8 Detection", annotated_frame)
+            cv2.imshow("ball Detection", annotated_frame)
 
             # Convert results to JSON and parse
             json_results = json.loads(results[0].to_json())

@@ -1,0 +1,5 @@
+{
+    "model_path": "ball_model2.pt",
+    "camera_index": 0,
+    "api_url": "admin.pinballrace.com/api/submit_rankings"
+}
