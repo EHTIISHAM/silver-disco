@@ -52,6 +52,19 @@ class DetectorThread(threading.Thread):
         self.log = log_callback
         self.stop_event = stop_event
 
+    def sort_my_balls(detections):
+        """
+        Sort ball detections from left to right using x1 (left boundary of the box).
+        Returns a list of ball names in order.
+        """
+        if not detections:
+            return []
+
+        # Sort by x1 (leftmost coordinate)
+        sorted_dets = sorted(detections, key=lambda d: d["box"]["x1"])
+
+        # Return names only
+        return [d["name"] for d in sorted_dets]
     def run(self):
         new_w, new_h = 1280, 720
 
@@ -153,10 +166,20 @@ class DetectorThread(threading.Thread):
             if len(ball_rankings) >= 10 or time_tag == True:
                 self.log(f"🏁 Ball Rankings ready: {ball_rankings}")
                 print(ball_rankings)
+                ball_rankings = self.sort_my_balls(ball_detections)
                 cv2.imwrite("detected frame.jpg", annotated_frame)
                 try:
-                    response = requests.post(self.config["api_url"], json=ball_rankings)
-                    self.log(f"Sent to API — Status {response.status_code}")
+                    response = requests.post("admin.pinballrace.com/api/games/status")
+                    if response.status_code == 200:
+                        current_game = response.json().get("currentGame", "N/A")
+                        if current_game != "N/A" and current_game["status"] == "Ongoing":
+                            self.log(f"Current Game: {current_game['gameNumber']} - {current_game['status']}")
+                            ball_rankings  = {name: rank+1 for rank, name in enumerate(ball_rankings)}
+
+                            response2 = requests.post(self.config["api_url"], json=ball_rankings)
+                            self.log(f"Sent to API Game {current_game['gameNumber']}: {response2.status_code} ")
+                    else:
+                        self.log(f"Failed to fetch game status: {response.status_code}")
                 except Exception as e:
                     self.log(f"API Error: {e}")
                 
