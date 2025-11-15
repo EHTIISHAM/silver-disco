@@ -35,6 +35,8 @@ DB_NAME = os.getenv("DB_NAME", "pinballrace_com")
 SECRET_KEY = os.getenv("SECRET_KEY", "supersecret")
 SESSION_EXPIRE_SECONDS = int(os.getenv("SESSION_EXPIRE_SECONDS", "86400"))
 
+POS_POINT = { "1": 25, "2": 10, "3": 5, "4": 1, "5": 1 , "6": 1, "7": 1, "8": 1, "9": 1, "10": 1 }
+
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
@@ -473,6 +475,59 @@ async def submit_rankings(rankings: Dict[str, int]):
     # This endpoint can be used to receive ball rankings from the detection script
     # For now, we will just log them and return a success response
     print("Received ball rankings:", rankings)
+    current_game = await db.games.find_one({"status": "Ongoing"})
+    # in current game add the ball rankings in ball_ rankings
+    if current_game:
+        await db.games.update_one(
+            {"_id": current_game["_id"]},
+            {"$set": {"ball_rankings": rankings}}
+        )
+        # extract the participants
+        participants = current_game.get("participants", [])
+        if participants:
+            for participant in participants:
+                # get userId or email direct from participant
+                participant_id = participant.get("userId") or participant.get("email") or participant.get("participantId")
+                ball_number = participant.get("ball")
+                ball_number_str = "ball_" + str(ball_number)
+                if ball_number_str in rankings:
+                    position = rankings[ball_number_str]
+                    points = POS_POINT.get(str(position), 0)
+                    # update user points in users collection
+                    user = await db.users.find_one({"$or": [{"_id": ObjectId(participant_id)}, {"email": participant_id}]})
+                    if user:
+                        new_points = user.get("points", 0) + points
+                        await db.users.update_one(
+                            {"_id": user["_id"]},
+                            {"$set": {"points": new_points}}
+                        )
+                        # update numberOfWins if position is 1,2,3
+                        if position in [1, 2, 3]:
+                            new_wins = user.get("numberOfWins", 0) + 1
+                            await db.users.update_one(
+                                {"_id": user["_id"]},
+                                {"$set": {"numberOfWins": new_wins}}
+                            )
+                        # create streak in user
+                        if position == 1:
+                            new_streak = user.get("winningStreak", 0) + 1
+                            await db.users.update_one(
+                                {"_id": user["_id"]},
+                                {"$set": {"winningStreak": new_streak}}
+                            )
+                        else:
+                            # reset streak
+                            await db.users.update_one(
+                                {"_id": user["_id"]},
+                                {"$set": {"winningStreak": 0}}
+                            )
+                        # increment the racesPlayed
+                        new_races_played = user.get("racesPlayed", 0) + 1
+                        await db.users.update_one(
+                            {"_id": user["_id"]},
+                            {"$set": {"racesPlayed": new_races_played}}
+                        )
+            
     return {"status": "success", "message": "Rankings received"}
 # ---------- Startup: ensure counters exist ----------
 @app.on_event("startup")
