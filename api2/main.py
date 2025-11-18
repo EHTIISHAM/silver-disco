@@ -86,6 +86,55 @@ def verify_password(plain: str, hashed: str) -> bool:
     except Exception:
         return False
 
+def leaderboard_entry(current_game, rankings):
+    """Create leaderboard entries based on game results and rankings."""
+    async def inner():
+        participants = current_game.get("participants", [])
+        game_id = current_game["_id"]
+        game_number = current_game["gameNumber"]
+        game_type = current_game["gameType"]
+        playedAt = current_game.get("createdAt","No Time")
+        # players that selected first postion ball
+        # fisrt ball is first item of rankings
+        first_position_ball = None
+        top_5_balls = []
+        for ball_key, position in rankings.items():
+            if position == 1:
+                first_position_ball = int(ball_key.replace("ball_", ""))
+            if position <=5:
+                top_5_balls.append(int(ball_key.replace("ball_", "")))
+
+        playername_with_first_ball = None 
+        for participant in participants:
+            if participant.get("ball") == first_position_ball:
+                playername_with_first_ball = participant.get("username")
+                # get player index in participants
+                player_index = participants.index(participant)
+                break   
+        # get first position player details
+        first_player_details = await db.users.find_one({"username": playername_with_first_ball})
+        races_played = first_player_details.get("racesPlayed", 0) + 1
+        winning_streak = first_player_details.get("winningStreak", 0) + 1
+        wins = first_player_details.get("numberOfWins", 0) + 1
+        if playername_with_first_ball:
+            # insert into leaderboard 
+            await db.leaderboard.insert_one({
+                "gameId": game_id,
+                "raceId": game_number,
+                "datePlayed": playedAt,
+                "username": playername_with_first_ball,
+                "player": player_index,
+                "ballNumber": first_position_ball,
+                "position": 1,
+                "races": races_played,
+                "type": game_type,
+                "winningStreak": winning_streak,
+                "wins": wins,
+            })
+
+    return inner()
+
+
 async def scheduler():
     """Continuously manages game status transitions."""
     while True:
@@ -131,11 +180,10 @@ async def scheduler():
             )
             print(f"🚀 Game {game_id} is now Ongoing")
 
-            game_duration = game["timerTillNextGame"] * 60
             interval = 5  # check every 5 seconds if game was force-finished
-
             elapsed = 0
-            while elapsed < game_duration:
+            total_duration = int(game["timerPerRace"]) * 60  # convert minutes to seconds
+            while True:
                 await asyncio.sleep(interval)
                 elapsed += interval
 
@@ -145,14 +193,11 @@ async def scheduler():
                     print(f"⚡ Game {game_id} was force finished. Moving on.")
                     break
 
-            # 5️⃣ If still ongoing, mark as finished normally
-            ongoing = await db.games.find_one({"_id": game_id, "status": "Ongoing"})
-            if ongoing:
-                await db.games.update_one(
-                    {"_id": game_id},
-                    {"$set": {"status": "Finished", "endedAt": int(datetime.utcnow().timestamp() * 1000)}}
-                )
-                print(f"🏁 Game {game_id} is now Finished")
+                # check for endAt time if endAT found then stop the game
+                if "endedAt" in ongoing and ongoing["endedAt"] > 0:
+                    print(f"⚡ Game {game_id} has ended at {ongoing['endedAt']}. Moving on.")
+                    break
+                
 
             # 7️⃣ Move current_start forward for next game
             current_start = start_time + timedelta(minutes=game["timerTillNextGame"])
@@ -480,7 +525,8 @@ async def submit_rankings(rankings: Dict[str, int]):
     if current_game:
         await db.games.update_one(
             {"_id": current_game["_id"]},
-            {"$set": {"ball_rankings": rankings}}
+            {"$set": {"ball_rankings": rankings}},
+            {"$set": {"endedAt": int(datetime.utcnow().timestamp() * 1000)}}
         )
         # extract the participants
         participants = current_game.get("participants", [])
@@ -527,7 +573,8 @@ async def submit_rankings(rankings: Dict[str, int]):
                             {"_id": user["_id"]},
                             {"$set": {"racesPlayed": new_races_played}}
                         )
-            
+        await leaderboard_entry(current_game, rankings)
+
     return {"status": "success", "message": "Rankings received"}
 # ---------- Startup: ensure counters exist ----------
 @app.on_event("startup")
