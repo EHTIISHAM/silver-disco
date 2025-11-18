@@ -90,7 +90,7 @@ const RaceDashboard: React.FC = () => {
   const fetchRecentRaces = async () => {
     try {
       console.log("🔄 Fetching leaderboard data...");
-      const res = await fetch(`${import.meta.env.VITE_SERVER_URL}/api/leaderboard?temp=true&compT=simple`);
+      const res = await fetch(`${import.meta.env.VITE_SERVER_URL}/api/leaderboard?temp=false`);
 
 
       // Check if request failed
@@ -99,16 +99,15 @@ const RaceDashboard: React.FC = () => {
       }
 
       const data = await res.json();
-      console.log("✅ Leaderboard data received:", data);
 
       // If your backend sends { users: [...] }
       if (data.users && Array.isArray(data.users)) {
         setRecentRaces(data.users.slice(0, 3));
       } else {
-        console.warn("⚠ Unexpected data structure:", data);
+        console.error("Unexpected data format");
       }
     } catch (err) {
-      console.error("❌ Error fetching leaderboard:", err);
+      console.error("Error fetching leaderboard");
     }
   };
 

@@ -8,17 +8,12 @@ export const getLeaderboard = async (req: Request, res: Response): Promise<void>
   try {
     const useTemp = req.query.temp === "true";
     const time = req.query.time as string;
-    const compT = req.query.compT as string;
     const raceId = req.query.raceId as string | undefined;
     const customFrom = req.query.from as string | undefined;
     const customTo = req.query.to as string | undefined;
 
     let Model: mongoose.Model<any> = useTemp ? LeaderboardTemp : Leaderboard;
     let filter: any = {};
-
-    // ✅ Race type filter
-    if (compT === "simple") filter.type = "simple";
-    if (compT === "comps") filter.type = "comps";
 
     // ✅ Time filter
     Object.assign(filter, buildTimeFilter(time, customFrom, customTo));

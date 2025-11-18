@@ -126,6 +126,7 @@ def leaderboard_entry(current_game, rankings):
                 "player": player_index,
                 "ballNumber": first_position_ball,
                 "position": 1,
+                "top5Balls": top_5_balls,
                 "races": races_played,
                 "type": game_type,
                 "winningStreak": winning_streak,
