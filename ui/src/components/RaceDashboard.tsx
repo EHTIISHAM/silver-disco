@@ -304,7 +304,7 @@ useEffect(() => {
 
         {/* ----- Recent Races (Fetched from Backend) ----- */}
         {/* <div className="bg-[#111] rounded-white 2xl p-4 shadow border border-gray-800"> */}
-        <div className="bg-[#121212] rounded-2xl p-4 shadow border border-gray-800 flex flex-col justify-between">
+        <div className="bg-[#121212] rounded-2xl p-4 shadow border border-gray-800 flex flex-col gap-2">
 
           
           <h2 className="text-sm text--400 mb-3">Recent races</h2>

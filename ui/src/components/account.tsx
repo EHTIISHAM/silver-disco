@@ -51,7 +51,7 @@ interface UserData {
 
 interface StatsData {
   totalRaces: number;
-  totalPoints: number;
+  points: number;
   totalWins: number;
   streak?: number;
   finishRate?: number;
@@ -99,7 +99,7 @@ const AccountScreen: React.FC = () => {
       // Map stats to frontend Stat[]
       setStats([
         { icon: Flag, value: statsJson.totalRaces ?? 0, label: "Races" },
-        { icon: Clock, value: statsJson.totalPoints ?? 0, label: "Points", color: "text-green-400" },
+        { icon: Clock, value: statsJson.points ?? 0, label: "Points", color: "text-green-400" },
         { icon: Award, value: statsJson.streak ?? 0, label: "Streak" },
         { icon: Trophy, value: statsJson.totalWins ?? 0, label: "Wins" },
       ]);

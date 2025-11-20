@@ -195,23 +195,22 @@ export default function RaceHistory() {
     "Custom date",
   ];
 
-  const gameTypeOptions = ["All", "Standard", "Eliminator"];
+  const gameTypeOptions = ["Regular", "Lottery", "Elimination"];
 
   const races = [
     {
       id: "#18092501",
-      mode: "Standard",
+      mode: "Regular",
       timeRange: "14:30 – 14:32",
       duration: "2:34",
       position: "3rd",
-     // <-- ball in correct place (you asked for ball 7)
       topFinishers: [
         {
           name: "SpeedDemon",
           position: "1st",
           time: "2:44",
           ball: "Ball 12",
-          icon: Crown1, // image import used directly
+          icon: Crown1, 
         },
         {
           name: "BallMaster",

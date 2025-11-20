@@ -7,7 +7,7 @@ export interface ILeaderboard extends Document {
   wins: number;
   points: number;
   datePlayed?: Date;
-  type: "simple" | "comps";
+  type: "Regular" | "Lottery" | "Elimination";
   raceId?: string;
 }
 
@@ -18,7 +18,7 @@ const leaderboardSchema = new Schema<ILeaderboard>({
   wins: Number,
   points: Number,
   datePlayed: { type: Date, default: Date.now },
-  type: { type: String, enum: ["simple", "comps"], required: true },
+  type: { type: String, enum: ["Regular" , "Lottery" , "Elimination"], required: true },
   raceId: { type: String, required: false },
 });
 

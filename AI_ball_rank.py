@@ -82,11 +82,16 @@ class DetectorThread(threading.Thread):
             self.log("No GPU detected. Running on CPU.")
 
         model.to(device)
-        cap = cv2.VideoCapture(self.config["camera_index"])
-        if not cap.isOpened():
-            self.log("Failed to open camera.")
-            return
-
+        try:
+            cap = cv2.VideoCapture(int(self.config["camera_index"]))
+            if not cap.isOpened():
+                self.log("Failed to open camera.")
+                return
+        except:
+            cap = cv2.VideoCapture(self.config["camera_index"])
+            if not cap.isOpened():
+                self.log("Failed to open video.")
+                return
         self.log("Detection started.")
         ball_rankings = {}
         initial_ball_count = 0
@@ -155,7 +160,7 @@ class DetectorThread(threading.Thread):
                 # Case 2: Same count — check for timeout
                 elif current_count == initial_ball_count:
                     elapsed = time.time() - start_time
-                    if elapsed > 5:
+                    if elapsed > 10:
                         print("Timeout reached for current detections.")
                         time_tag = True
             else:
@@ -247,7 +252,7 @@ class DetectionApp:
 
     def save_settings(self):
         self.config["model_path"] = self.model_entry.get()
-        self.config["camera_index"] = int(self.camera_entry.get())
+        self.config["camera_index"] = self.camera_entry.get()
         self.config["api_url"] = self.api_entry.get()
         save_config(self.config)
         messagebox.showinfo("Settings", "Settings saved successfully!")
