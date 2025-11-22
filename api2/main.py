@@ -96,12 +96,12 @@ async def leaderboard_entry(current_game, rankings):
     # players that selected first postion ball
     # fisrt ball is first item of rankings
     first_position_ball = None
-    top_5_balls = []
+    top_10_balls = []
     for ball_key, position in rankings.items():
         if position == 1:
             first_position_ball = int(ball_key.replace("ball_", ""))
-        if position <=5:
-            top_5_balls.append(int(ball_key.replace("ball_", "")))
+        if position <=10:
+            top_10_balls.append(int(ball_key.replace("ball_", "")))
 
     playername_with_first_ball = None 
     player_index = None
@@ -117,10 +117,11 @@ async def leaderboard_entry(current_game, rankings):
     first_player_details = await db.users.find_one({"username": playername_with_first_ball})
     if first_player_details is None:
         first_player_details = {"username": "No First Player"}   
-    races_played = first_player_details.get("racesPlayed", 0) + 1
+    races_played = sum(race.get("races", 0) for race in first_player_details.get("racesPlayed", [])) + 1
     winning_streak = first_player_details.get("winningStreak", 0) + 1
-    wins = first_player_details.get("numberOfWins", 0) + 1
-    points = first_player_details.get("points", 0)
+    # sum up all the wins from numberOfWins array
+    wins = sum(win.get("wins", 0) for win in first_player_details.get("numberOfWins", [])) + 1
+    points = first_player_details.get("total_points", 0) + POS_POINT.get("1", 0)
     # insert into leaderboard 
     # log the first position player details
     print(f"Logging leaderboard entry for player: {playername_with_first_ball}")
@@ -133,7 +134,7 @@ async def leaderboard_entry(current_game, rankings):
         "ballNumber": first_position_ball,
         "points": points,
         "position": 1,
-        "top5Balls": top_5_balls,
+        "top10Balls": top_10_balls,
         "races": races_played,
         "type": game_type,
         "winningStreak": winning_streak,
@@ -566,6 +567,10 @@ async def api_get_all_users(request: Request):
         for u in users
     ]
 
+# this is a new leaderbaord route 
+# this will take all the user data from latest updated to old updated from mongodb user
+# 
+
 @app.post("/api/prizes/delete")
 async def api_delete_prize(request: Request, prize_id: str = Form(...)):
     await require_login(request)
@@ -597,20 +602,25 @@ async def submit_rankings(rankings: Dict[str, int]):
                 if ball_number_str in rankings:
                     position = rankings[ball_number_str]
                     points = POS_POINT.get(str(position), 0)
-                    # update user points in users collection
+                    # update user total_points in users collection and in points add like this {"points": {points},{utc time now}}
+                    # racePlayed  will be store like this "racesPlayed": +1, utc time now
+                    # numberOfWins +1 if position is 1,2,3 and utc time now
                     user = await db.users.find_one({"$or": [{"_id": ObjectId(participant_id)}, {"email": participant_id}]})
                     if user:
                         new_points = user.get("points", 0) + points
                         await db.users.update_one(
                             {"_id": user["_id"]},
-                            {"$set": {"points": new_points}}
+                            {"$set": {"total_points": new_points}}
+                        )
+                        await db.users.update_one(
+                            {"_id": user["_id"]},
+                            {"$push": {"points": {"points": points, "timestamp": int(datetime.utcnow().timestamp() * 1000)}}}
                         )
                         # update numberOfWins if position is 1,2,3
                         if position in [1, 2, 3]:
-                            new_wins = user.get("numberOfWins", 0) + 1
                             await db.users.update_one(
                                 {"_id": user["_id"]},
-                                {"$set": {"numberOfWins": new_wins}}
+                                {"$push": {"numberOfWins": {"wins": 1, "timestamp": int(datetime.utcnow().timestamp() * 1000)}}}
                             )
                         # create streak in user
                         if position == 1:
@@ -626,10 +636,9 @@ async def submit_rankings(rankings: Dict[str, int]):
                                 {"$set": {"winningStreak": 0}}
                             )
                         # increment the racesPlayed
-                        new_races_played = user.get("racesPlayed", 0) + 1
                         await db.users.update_one(
                             {"_id": user["_id"]},
-                            {"$set": {"racesPlayed": new_races_played}}
+                            {"$push": {"racesPlayed": {"races": 1, "timestamp": int(datetime.utcnow().timestamp() * 1000)}}}
                         )
         await leaderboard_entry(current_game, rankings)
         # mark current game as Finished
