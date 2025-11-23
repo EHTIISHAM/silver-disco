@@ -19,9 +19,8 @@ interface Player {
   races: number;
   wins: number;
   points: number;
-  pfp?: string;
-  date?: string;
 }
+
 
 const competitionsData = {
   current: {
@@ -56,55 +55,14 @@ const competitionsData = {
   ],
 };
 
-// Helper: filter leaderboard by date range
-function filterByDateRange(data: Player[], range: string, customDate?: string) {
-  const now = new Date();
-
-  return data.filter((player) => {
-    if (!player.date) return true;
-    const playerDate = new Date(player.date);
-
-    switch (range) {
-      case "Today":
-        return playerDate.toDateString() === now.toDateString();
-      case "Yesterday":
-        const yesterday = new Date();
-        yesterday.setDate(now.getDate() - 1);
-        return playerDate.toDateString() === yesterday.toDateString();
-      case "Last 7 days":
-        const last7Days = new Date();
-        last7Days.setDate(now.getDate() - 7);
-        return playerDate >= last7Days;
-      case "Last 30 days":
-        const last30Days = new Date();
-        last30Days.setDate(now.getDate() - 30);
-        return playerDate >= last30Days;
-      case "Last 90 days":
-        const last90Days = new Date();
-        last90Days.setDate(now.getDate() - 90);
-        return playerDate >= last90Days;
-      case "12 Months":
-        const last12Months = new Date();
-        last12Months.setFullYear(last12Months.getFullYear() - 1);
-        return playerDate >= last12Months;
-      case "Custom date":
-        if (!customDate) return true;
-        const target = new Date(customDate);
-        return playerDate.toDateString() === target.toDateString();
-      default:
-        return true; // "All time"
-    }
-  });
-}
 
 const Leaderboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"AllRaces" | "Competitions">("AllRaces");
   const [leaderboardData, setLeaderboardData] = useState<Player[]>([]);
-  const [filteredData, setFilteredData] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [showDateOptions, setShowDateOptions] = useState(false);
-  const [selectedDate, setSelectedDate] = useState("This Week");
+  const [selectedDate, setSelectedDate] = useState("Today");
   const [customDate, setCustomDate] = useState<string | undefined>();
 
   const dateOptions = [
@@ -118,42 +76,45 @@ const Leaderboard: React.FC = () => {
     "Custom date",
   ];
 
-  useEffect(() => {
-    const fetchRecentRaces = async () => {
-      try {
-        setLoading(true);
-        const res = await fetch(`${import.meta.env.VITE_SERVER_URL}/api/leaderboard?temp=false&compT=simple`);
-        if (!res.ok) throw new Error(`Server responded with ${res.status}`);
-        const data = await res.json();
+useEffect(() => {
+  const fetchLeaderboard = async () => {
+    try {
+      setLoading(true);
 
-        if (data.users && Array.isArray(data.users)) {
-          const formatted: Player[] = data.users.map((user: any, i: number) => ({
-            name: user.username || `Player ${i + 1}`,
-            position: user.position || i + 1,
-            races: user.races || 0,
-            wins: user.wins || 0,
-            points: user.points || 0,
-            pfp: user.pfp,
-            date: user.date || new Date(Date.now() - i * 86400000).toISOString(),
-          }));
+      let query = `${import.meta.env.VITE_PY_SERVER_URL}/api/leaderboard?timeline=${encodeURIComponent(selectedDate)}`;
 
-          setLeaderboardData(formatted);
-          setFilteredData(formatted);
-        }
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
+      // If custom date selected
+      if (selectedDate === "Custom date" && customDate) {
+        query += `&from=${customDate}&to=${customDate}`;
       }
-    };
 
-    fetchRecentRaces();
-  }, []);
+      const res = await fetch(query);
+      if (!res.ok) throw new Error(`Server responded with ${res.status}`);
 
-  useEffect(() => {
-    const result = filterByDateRange(leaderboardData, selectedDate, customDate);
-    setFilteredData(result);
-  }, [selectedDate, customDate, leaderboardData]);
+      const data = await res.json();
+
+      if (data.data && Array.isArray(data.data)) {
+        const formatted: Player[] = data.data.map((user: any, i: number) => ({
+          name: user.username,
+          position: i + 1,             // Already sorted by backend
+          races: user.races,
+          wins: user.numberOfWins,
+          points: user.points,
+        }));
+
+        setLeaderboardData(formatted);
+      }
+
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchLeaderboard();
+}, [selectedDate, customDate]);
+
 
   return (
     <div className="bg-black min-h-screen flex flex-col items-center py-6 px-4">
@@ -243,13 +204,13 @@ const Leaderboard: React.FC = () => {
           {/* Leaderboard Data */}
           {loading ? (
             <p className="text-gray-400 text-center">Loading leaderboard...</p>
-          ) : filteredData.length === 0 ? (
+          ) : leaderboardData.length === 0 ? (
             <p className="text-gray-400 text-center">
               No leaderboard data found for selected date.
             </p>
           ) : (
             <div className="space-y-3">
-              {filteredData.map((player) => {
+              {leaderboardData.map((player) => {
                 let icon = null;
                 if (player.position === 1)
                   icon = <img src={first} alt="1st" className="w-5 h-5 object-contain" />;

@@ -13,8 +13,10 @@ import base64
 import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
+
+from urllib3 import request
 from bson import ObjectId
-from fastapi import FastAPI, Request, Form, Response, HTTPException, status
+from fastapi import FastAPI, Request, Form, Response, HTTPException, BackgroundTasks, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -59,6 +61,9 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Mongo client
 mongo = AsyncIOMotorClient(MONGO_URI)
 db = mongo[DB_NAME]
+
+class UserEmail(BaseModel):
+    email: str
 
 # ---------- Utilities ----------
 async def get_next_sequence( name: str) -> int:
@@ -567,9 +572,206 @@ async def api_get_all_users(request: Request):
         for u in users
     ]
 
+def safe_ts(value):
+    if isinstance(value, datetime):
+        return int(value.replace(tzinfo=timezone.utc).timestamp())
+    if isinstance(value, (int, float)):
+        return int(value)
+    try:
+        return int(value)
+    except:
+        return None
+
+# ---- MAIN ROUTE ----
+@app.post("/api/user/stats") 
+async def user_stats(user_email_data: UserEmail):
+    """
+    Returns user stats for dashboard based on email provided in the request body.
+    """
+    email = user_email_data.email
+    
+    # Retrieve user based on email instead of cookie/userId
+    user = await db.users.find_one({"_id": ObjectId(email)})
+    
+    if not user:
+        raise HTTPException(499, f"User with id '{email}' not found.")
+    # Extract lists OR default to empty
+    wins_list = user.get("numberOfWins", []) or []
+    races_list = user.get("racesPlayed", []) or []
+    points_list = user.get("points", []) or []
+
+    # ---- SUM WINS ----
+    total_wins = sum(
+        w.get("wins", 0)
+        for w in wins_list
+        if (ts := safe_ts(w.get("timestamp"))) is not None
+    )
+
+    # ---- SUM RACES ----
+    total_races = sum(
+        r.get("races", 0)
+        for r in races_list
+        if (ts := safe_ts(r.get("timestamp"))) is not None
+    )
+
+    # ---- SUM POINTS ----
+    total_points = sum(
+        p.get("points", 0)
+        for p in points_list
+        if (ts := safe_ts(p.get("timestamp"))) is not None
+    )
+
+    # ---- STREAK (your DB field) ----
+    streak = user.get("winningStreak", 0)
+
+    return {
+        "username": user.get("username"),
+        "totalWins": total_wins,
+        "totalRaces": total_races,
+        "points": total_points,
+        "streak": streak,
+    }
+
 # this is a new leaderbaord route 
 # this will take all the user data from latest updated to old updated from mongodb user
-# 
+
+LEADERBOARD_CACHE = {
+    "data": [],
+    "last_update": None
+}
+
+CACHE_REFRESH_MINUTES = 2
+
+
+def get_time_range(timeline: str):
+    now = datetime.now(timezone.utc)
+
+    TIMELINE_MAP = {
+        "today": "today",
+        "yesterday": "yesterday",
+        "last 7 days": "last_7",
+        "last 30 days": "last_30",
+        "last 90 days": "last_90",
+        "12 months": "last_12_months",
+        "all time": "all",
+        "custom date": "custom"
+    }
+
+    key = timeline.strip().lower()
+
+    if key not in TIMELINE_MAP:
+        raise HTTPException(400, f"Invalid timeline: {timeline}")
+
+    timeline_key = TIMELINE_MAP[key]
+
+    # NOW PROCESS
+    if timeline_key == "today":
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        end = now
+
+    elif timeline_key == "yesterday":
+        y = now - timedelta(days=1)
+        start = y.replace(hour=0, minute=0, second=0, microsecond=0)
+        end = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    elif timeline_key == "last_7":
+        start = now - timedelta(days=7)
+        end = now
+
+    elif timeline_key == "last_30":
+        start = now - timedelta(days=30)
+        end = now
+
+    elif timeline_key == "last_90":
+        start = now - timedelta(days=90)
+        end = now
+
+    elif timeline_key == "last_12_months":
+        start = now - timedelta(days=365)
+        end = now
+
+    elif timeline_key == "all":
+        start = datetime.min.replace(tzinfo=timezone.utc)
+        end = now
+
+    elif timeline_key == "custom":
+        raise HTTPException(400, "Custom range not implemented.")
+    # convert start and end to int
+    start = int(start.timestamp())
+    end = int(end.timestamp())
+    return start, end
+
+
+async def compute_leaderboard(start_ts, end_ts):
+    """Compute leaderboard from DB and update cache."""
+    users_cursor = db.users.find({})
+    users = await users_cursor.to_list(None)
+
+    new_data = []
+
+    for user in users:
+        username = user.get("username", "Unknown")
+
+        wins_list = user.get("numberOfWins", [])
+        races_list = user.get("racesPlayed", [])
+        points_list = user.get("points", [])
+
+        total_wins = sum(w.get("wins", 0)
+                         for w in wins_list
+                         if "timestamp" in w and start_ts <= w["timestamp"] <= end_ts)
+
+        total_races = sum(r.get("races", 0)
+                          for r in races_list
+                          if "timestamp" in r and start_ts <= r["timestamp"] <= end_ts)
+
+        total_points = sum(p.get("points", 0)
+                           for p in points_list
+                           if "timestamp" in p and start_ts <= p["timestamp"] <= end_ts)
+        if total_points == 0:
+            continue
+        new_data.append({
+            "username": username,
+            "numberOfWins": total_wins,
+            "races": total_races,
+            "points": total_points
+        })
+
+    # ---- Sort by points only (DESC) ----
+    new_data.sort(key=lambda x: x["points"], reverse=True)
+
+    # Update cache
+    LEADERBOARD_CACHE["data"] = new_data
+    LEADERBOARD_CACHE["last_update"] = datetime.now(timezone.utc)
+
+
+def cache_expired():
+    """Return True if cache is expired."""
+    last = LEADERBOARD_CACHE["last_update"]
+    if last is None:
+        return True
+    return datetime.now(timezone.utc) - last > timedelta(minutes=CACHE_REFRESH_MINUTES)
+
+@app.get("/api/leaderboard")
+async def leaderboard_new(timeline: str, background_tasks: BackgroundTasks):
+    """
+    Ultra-fast leaderboard with:
+    - Background caching
+    - Auto refresh
+    - Sorted by points only
+    """
+    start_ts, end_ts = get_time_range(timeline)
+
+    # If expired → refresh in background (but return old cache instantly)
+    if cache_expired():
+        background_tasks.add_task(compute_leaderboard, start_ts, end_ts)
+
+    # Return existing cached data immediately
+    return {
+        "cached_at": LEADERBOARD_CACHE["last_update"],
+        "refreshing": cache_expired(),
+        "data": LEADERBOARD_CACHE["data"]
+    }
+
 
 @app.post("/api/prizes/delete")
 async def api_delete_prize(request: Request, prize_id: str = Form(...)):
@@ -614,13 +816,13 @@ async def submit_rankings(rankings: Dict[str, int]):
                         )
                         await db.users.update_one(
                             {"_id": user["_id"]},
-                            {"$push": {"points": {"points": points, "timestamp": int(datetime.utcnow().timestamp() * 1000)}}}
+                            {"$push": {"points": {"points": points, "timestamp": int(datetime.utcnow().timestamp())}}}
                         )
                         # update numberOfWins if position is 1,2,3
                         if position in [1, 2, 3]:
                             await db.users.update_one(
                                 {"_id": user["_id"]},
-                                {"$push": {"numberOfWins": {"wins": 1, "timestamp": int(datetime.utcnow().timestamp() * 1000)}}}
+                                {"$push": {"numberOfWins": {"wins": 1, "timestamp": int(datetime.utcnow().timestamp())}}}
                             )
                         # create streak in user
                         if position == 1:
@@ -638,7 +840,7 @@ async def submit_rankings(rankings: Dict[str, int]):
                         # increment the racesPlayed
                         await db.users.update_one(
                             {"_id": user["_id"]},
-                            {"$push": {"racesPlayed": {"races": 1, "timestamp": int(datetime.utcnow().timestamp() * 1000)}}}
+                            {"$push": {"racesPlayed": {"races": 1, "timestamp": int(datetime.utcnow().timestamp())}}}
                         )
         await leaderboard_entry(current_game, rankings)
         # mark current game as Finished
