@@ -1,3 +1,13 @@
+export interface PointsEntry {
+  points: number;
+  timestamp: number;
+}
+
+export interface WinsEntry {
+  wins: number;
+  timestamp: number;
+}
+
 export interface User {
   userType: "User" | "Admin";
   email: string;
@@ -8,8 +18,8 @@ export interface User {
   clientToken: string;
   refreshToken: string;
   consented: boolean;
-  points: number;
-  numberOfWins: number;
+  points: PointsEntry[]; 
+  numberOfWins: WinsEntry[];
   googleId?: string;
   tiktokId?: string;
   twitchId?: string;

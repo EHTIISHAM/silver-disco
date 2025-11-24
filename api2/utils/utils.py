@@ -80,10 +80,14 @@ async def join_latest_game(
                 (email and participant.get("email") == user.get("email"))
             ):
                 raise HTTPException(status_code=400, detail="User already joined the game")
-
+        # calculate users total points
+        user_stats = await db.users.find_one({"_id": ObjectId(userId)})
+        points = user_stats.get("points", []) if user_stats else []
+        total_points = sum(p["points"] for p in points if isinstance(p["points"], (int, float)))
         # 4️⃣ Add user to participants
         participant_data = {
             "userId": str(user["_id"]),
+            "points": total_points,
             "username": user.get("username", "Unknown"),
             "pfp": user.get("pfp", ""),
             "ball": ball

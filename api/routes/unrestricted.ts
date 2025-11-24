@@ -12,7 +12,6 @@ import { authenticateTwitch } from "../controllers/unrestricted/authenticateTwit
 import { twitchRedirect } from "../controllers/unrestricted/twitchRedirect";
 import { logout } from "../controllers/unrestricted/logout";
 import leaderboardRoutes from "./leaderboardRoutes";
-import { gameWebhook } from "../controllers/unrestricted/gameWebhook";
 import { getUserStats } from "../controllers/unrestricted/userStats";
 import { getTiktokStatus } from "../controllers/unrestricted/getTiktokStatus";
 import { getGames } from "../controllers/unrestricted/getGames";
@@ -37,7 +36,6 @@ unrestricted.get("/twitchRedirect", twitchRedirect);
 
 unrestricted.post("/logout", logout);
 
-unrestricted.post("/game_webhook", gameWebhook);
 
 unrestricted.get("/authenticate_tiktok", authenticateTiktok);
 unrestricted.get("/redirect", redirect);

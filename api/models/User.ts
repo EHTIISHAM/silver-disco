@@ -11,8 +11,19 @@ const schema = new Schema<User>({
   clientToken: { type: String, required: false, unique: true, sparse: true },
   refreshToken: { type: String, required: false, unique: true, sparse: true },
   consented: { type: Boolean, default: true, required: false },
-  points: { type: Number, default: 0, required: true },
-  numberOfWins: { type: Number, default: 0, required: true },
+  points: [
+    {
+      points: { type: Number, default: 0 },
+      timestamp: { type: Number, default: Date.now },
+    },
+  ],
+  
+  numberOfWins: [
+    {
+      wins: { type: Number, default: 0 },
+      timestamp: { type: Number, default: Date.now },
+    },
+  ],
   createdAt: { type: Number, default: Date.now() },
   googleId: String,
   tiktokId: String,

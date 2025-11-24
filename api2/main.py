@@ -65,6 +65,28 @@ db = mongo[DB_NAME]
 class UserEmail(BaseModel):
     email: str
 
+class HistoryRequest(BaseModel):
+    userId: str
+    limit: int = 10  # Default to last 10 races
+    gameType: str = "All" # Optional filter
+
+class GameModel(BaseModel):
+    gameType: str
+    numberOfBalls: int = 12
+    bonusBalls: Optional[int] = 0
+    starttimeofgame: int
+    prizeId: str
+    timerPerRace: str
+    timerTillNextGame: str
+    participants: List = []
+    attempters: List = []
+    winners: List = []
+    status: str = "Not Started"
+    gameNumber: int
+    createdAt: int = int(datetime.now(timezone.utc).timestamp()*1000)
+    endedAt: int
+
+
 # ---------- Utilities ----------
 async def get_next_sequence( name: str) -> int:
     """Auto-increment counter that resets daily."""
@@ -335,23 +357,6 @@ def format_timestamp(timestamp: int) -> str:
     except:
         return 'N/A'
 
-# ---------- Models ----------
-class GameModel(BaseModel):
-    gameType: str
-    numberOfBalls: int = 12
-    bonusBalls: Optional[int] = 0
-    starttimeofgame: int
-    prizeId: str
-    timerPerRace: str
-    timerTillNextGame: str
-    participants: List = []
-    attempters: List = []
-    winners: List = []
-    status: str = "Not Started"
-    gameNumber: int
-    createdAt: int = int(datetime.now(timezone.utc).timestamp()*1000)
-    endedAt: int
-
 
 # ---------- Auth endpoints ----------
 @app.get("/login", response_class=HTMLResponse)
@@ -582,7 +587,7 @@ def safe_ts(value):
     except:
         return None
 
-# ---- MAIN ROUTE ----
+
 @app.post("/api/user/stats") 
 async def user_stats(user_email_data: UserEmail):
     """
@@ -600,28 +605,24 @@ async def user_stats(user_email_data: UserEmail):
     races_list = user.get("racesPlayed", []) or []
     points_list = user.get("points", []) or []
 
-    # ---- SUM WINS ----
     total_wins = sum(
         w.get("wins", 0)
         for w in wins_list
         if (ts := safe_ts(w.get("timestamp"))) is not None
     )
 
-    # ---- SUM RACES ----
     total_races = sum(
         r.get("races", 0)
         for r in races_list
         if (ts := safe_ts(r.get("timestamp"))) is not None
     )
 
-    # ---- SUM POINTS ----
     total_points = sum(
         p.get("points", 0)
         for p in points_list
         if (ts := safe_ts(p.get("timestamp"))) is not None
     )
 
-    # ---- STREAK (your DB field) ----
     streak = user.get("winningStreak", 0)
 
     return {
@@ -632,12 +633,15 @@ async def user_stats(user_email_data: UserEmail):
         "streak": streak,
     }
 
-# this is a new leaderbaord route 
-# this will take all the user data from latest updated to old updated from mongodb user
 
 LEADERBOARD_CACHE = {
-    "data": [],
-    "last_update": None
+"today": {"last_update": None, "data": []},
+    "yesterday": {"last_update": None, "data": []},
+    "last_7_days": {"last_update": None, "data": []},
+    "last_30_days": {"last_update": None, "data": []},
+    "last_90_days": {"last_update": None, "data": []},
+    "last_12_months": {"last_update": None, "data": []},
+    "all_time": {"last_update": None, "data": []},
 }
 
 CACHE_REFRESH_MINUTES = 2
@@ -702,7 +706,7 @@ def get_time_range(timeline: str):
     return start, end
 
 
-async def compute_leaderboard(start_ts, end_ts):
+async def compute_leaderboard(start_ts, end_ts,timeline_key):
     """Compute leaderboard from DB and update cache."""
     users_cursor = db.users.find({})
     users = await users_cursor.to_list(None)
@@ -740,19 +744,26 @@ async def compute_leaderboard(start_ts, end_ts):
     new_data.sort(key=lambda x: x["points"], reverse=True)
 
     # Update cache
-    LEADERBOARD_CACHE["data"] = new_data
-    LEADERBOARD_CACHE["last_update"] = datetime.now(timezone.utc)
+    LEADERBOARD_CACHE[timeline_key] = {
+            "data": new_data,
+            "last_update": datetime.now(timezone.utc)
+        }
 
 
-def cache_expired():
-    """Return True if cache is expired."""
-    last = LEADERBOARD_CACHE["last_update"]
+def cache_expired(timeline_key):
+    """Return True if cache for specific timeline is expired or doesn't exist."""
+    if timeline_key not in LEADERBOARD_CACHE:
+        return True
+    
+    last = LEADERBOARD_CACHE[timeline_key].get("last_update")
     if last is None:
         return True
+        
+    # Check if 5 minutes have passed
     return datetime.now(timezone.utc) - last > timedelta(minutes=CACHE_REFRESH_MINUTES)
 
 @app.get("/api/leaderboard")
-async def leaderboard_new(timeline: str, background_tasks: BackgroundTasks):
+async def leaderboard_new(timeline: str):
     """
     Ultra-fast leaderboard with:
     - Background caching
@@ -760,18 +771,167 @@ async def leaderboard_new(timeline: str, background_tasks: BackgroundTasks):
     - Sorted by points only
     """
     start_ts, end_ts = get_time_range(timeline)
+    timeline_key = timeline.lower().replace(" ", "_") 
+    
+    # TODO: Handle "Custom Date" logic here
+    if timeline_key == "custom_date":
+         return {"data": [], "message": "Custom date not implemented yet"}
 
-    # If expired → refresh in background (but return old cache instantly)
-    if cache_expired():
-        background_tasks.add_task(compute_leaderboard, start_ts, end_ts)
+    # Check if cache is expired OR if key is missing entirely
+    if cache_expired(timeline_key):
+        # LOGIC CHANGE: 
+        # We ALWAYS await the computation. We do not use background tasks anymore.
+        # This ensures the user gets the latest data right now.
+        await compute_leaderboard(start_ts, end_ts, timeline_key)
 
-    # Return existing cached data immediately
+    # Retrieve from cache (It is guaranteed to be fresh now)
+    cached_entry = LEADERBOARD_CACHE.get(timeline_key, {"data": [], "last_update": None})
+
     return {
-        "cached_at": LEADERBOARD_CACHE["last_update"],
-        "refreshing": cache_expired(),
-        "data": LEADERBOARD_CACHE["data"]
+        "timeline": timeline_key,
+        "cached_at": cached_entry.get("last_update"),
+        "refreshing": False, # It's never refreshing in background anymore
+        "data": cached_entry.get("data", [])
     }
+def get_participant_by_ball(participants: List[Dict], ball_num: str):
+    """Finds a participant dict (username, etc.) given a ball number."""
+    for p in participants:
+        if str(p.get("ball")) == str(ball_num):
+            return p
+    return None
 
+@app.post("/api/user/race-history")
+async def get_race_history(req: HistoryRequest):
+    """
+    Fetches game history for a specific user.
+    Returns data formatted for the RaceHistory.jsx component.
+    """
+    
+    # 1. Build Query
+    # We look for games where 'participants.userId' matches the requested userId
+    query = {
+        "status": "Finished" # Only show finished games
+    }
+    
+    # Apply optional Game Type filter
+    if req.gameType != "All":
+        query["gameType"] = req.gameType
+
+    # 2. Execute Query (Sort by newest first)
+    cursor = db.games.find(query).sort("createdAt", -1).limit(req.limit)
+    
+    races_data = []
+
+    async for game in cursor:
+        try:
+            # --- A. Basic Info ---
+            start_ts = int(game.get("createdAt"))
+            end_ts = int(game.get("endedAt"))
+            duration_ms = end_ts - start_ts
+            
+            total_seconds = int(duration_ms / 1000)
+            minutes = total_seconds // 60
+            seconds = total_seconds % 60
+            duration_str = f"{minutes}:{seconds:02d}"
+
+            # --- B. Rank ALL Participants ---
+            rankings = game.get("ball_rankings", {}) # { "ball_12": 1, "ball_5": 2 }
+            participants = game.get("participants", [])
+            
+            processed_finishers = []
+
+            for p in participants:
+                # 1. Get the ball this user picked
+                b_num = str(p.get("ball"))
+                
+                # 2. Get the Rank of that ball
+                # If ball didn't finish, give it rank 999 (DNF)
+                rank_key = f"ball_{b_num}"
+                ball_rank = rankings.get(rank_key, 999) 
+                
+                # 3. Get User Points (Tie-breaker)
+                # Defaults to 0 if not saved in the game document
+                user_points = p.get("points", 0) 
+
+                processed_finishers.append({
+                    "participant": p,
+                    "ball_rank": ball_rank,   # Primary Sort: Lower is better
+                    "user_points": user_points, # Secondary Sort: Higher is better
+                    "ball_num": b_num
+                })
+
+            # --- C. Sort Logic ---
+            # Sort by: 
+            # 1. Ball Rank (Ascending) -> 1st place beats 2nd place
+            # 2. User Points (Descending) -> If both are 1st, higher points wins
+            processed_finishers.sort(key=lambda x: (x["ball_rank"], -x["user_points"]))
+
+            # --- D. Find "You" (The User) ---
+            user_position_str = "DNF"
+            user_ball_num = "?"
+            
+            # Find index of current user in the sorted list
+            for i, entry in enumerate(processed_finishers):
+                p = entry["participant"]
+                
+                # Check if this entry is the current user
+                if str(p.get("userId")) == str(req.userId):
+                    user_ball_num = entry["ball_num"]
+                    
+                    # Only assign a rank if the ball actually finished (rank < 999)
+                    if entry["ball_rank"] < 999:
+                        actual_rank = i + 1 # 0-index to 1-index
+                        
+                        # Format ordinal (1st, 2nd, 11th, etc)
+                        suffix = "th" if 11 <= actual_rank <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(actual_rank % 10, "th")
+                        user_position_str = f"{actual_rank}{suffix}"
+                    break
+
+            # --- E. Process Top 3 Finishers ---
+            top_finishers = []
+            
+            # Take the top 3 from our SORTED list of users
+            for i, entry in enumerate(processed_finishers[:3]):
+                # If this entry is a DNF (rank 999), stop adding to top 3
+                if entry["ball_rank"] >= 999:
+                    break
+
+                p = entry["participant"]
+                rank = i + 1 # Their specific rank in this list
+                
+                # Name Logic
+                w_name = p.get("username", "Unknown")
+                if str(p.get("userId")) == str(req.userId):
+                    w_name = "You"
+
+                # Ordinal
+                w_suffix = {1: "st", 2: "nd", 3: "rd"}.get(rank, "th")
+
+                top_finishers.append({
+                    "name": w_name,
+                    "position": f"{rank}{w_suffix}",
+                    "time": duration_str,
+                    "ball": f"Ball {entry['ball_num']}",
+                    "iconType": "crown" if rank == 1 else "medal"
+                })
+
+            # --- F. Construct Final Object ---
+            races_data.append({
+                "id": f"#{game.get('gameNumber', str(game['_id'])[-8:])}",
+                "mode": game.get("gameType", "Regular"),
+                "startTimestamp": start_ts,
+                "endTimestamp": end_ts,
+                "duration": duration_str,
+                "position": user_position_str,
+                "yourBall": f"Ball {user_ball_num}",
+                "topFinishers": top_finishers
+            })
+
+        except Exception as e:
+            print(f"Error processing game {game.get('_id')}: {e}")
+            continue
+
+    return races_data
 
 @app.post("/api/prizes/delete")
 async def api_delete_prize(request: Request, prize_id: str = Form(...)):
@@ -855,6 +1015,8 @@ async def submit_rankings(rankings: Dict[str, int]):
         )
 
     return {"status": "success", "message": "Rankings received"}
+
+
 # ---------- Startup: ensure counters exist ----------
 @app.on_event("startup")
 async def startup_event():

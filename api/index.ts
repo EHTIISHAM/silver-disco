@@ -11,7 +11,6 @@ import { createServer as createHttpsServer } from "https";
 import path from "path";
 import Routes from "./routes";
 import socketServer from "./socketServer";
-import games from "./service/games";
 import unrestricted from "./routes/unrestricted";
 import session from "express-session";
 import { Server } from "socket.io";
@@ -80,7 +79,6 @@ if (process.env.environment === "Development") {
 
   socketServer(server); // your existing socketServer logic
   const gameNamespace = io.of("/game");
-  games(gameNamespace);
  // pass io to games
 
   server.listen(port, () => {
@@ -110,7 +108,6 @@ const io = new Server(server, {
 });
   socketServer(server);
   const gameNamespace = io.of("/game");
-  games(gameNamespace);
 
 
   server.listen(port, () => {
