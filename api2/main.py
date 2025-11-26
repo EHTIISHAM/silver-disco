@@ -867,7 +867,7 @@ async def get_race_history(req: HistoryRequest):
             processed_finishers.sort(key=lambda x: (x["ball_rank"], -x["user_points"]))
 
             # --- D. Find "You" (The User) ---
-            user_position_str = "DNF"
+            user_position_str = "No Entry"
             user_ball_num = "?"
             
             # Find index of current user in the sorted list
@@ -880,12 +880,13 @@ async def get_race_history(req: HistoryRequest):
                     
                     # Only assign a rank if the ball actually finished (rank < 999)
                     if entry["ball_rank"] < 999:
-                        actual_rank = i + 1 # 0-index to 1-index
+                        # this will be equal to ball rank 
+                        actual_rank = entry["ball_rank"]
                         
                         # Format ordinal (1st, 2nd, 11th, etc)
                         suffix = "th" if 11 <= actual_rank <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(actual_rank % 10, "th")
                         user_position_str = f"{actual_rank}{suffix}"
-                    break
+                    break #? why this break?
 
             # --- E. Process Top 3 Finishers ---
             top_finishers = []
@@ -897,7 +898,7 @@ async def get_race_history(req: HistoryRequest):
                     break
 
                 p = entry["participant"]
-                rank = i + 1 # Their specific rank in this list
+                rank = entry["ball_rank"] # actual rank is ball_rank
                 
                 # Name Logic
                 w_name = p.get("username", "Unknown")
@@ -912,7 +913,7 @@ async def get_race_history(req: HistoryRequest):
                     "position": f"{rank}{w_suffix}",
                     "time": duration_str,
                     "ball": f"Ball {entry['ball_num']}",
-                    "iconType": "crown" if rank == 1 else "medal"
+                    "iconType": "crown" if rank == 1 else "medal1" if rank == 2 else "medal2"
                 })
 
             # --- F. Construct Final Object ---

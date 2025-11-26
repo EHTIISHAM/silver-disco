@@ -6,7 +6,6 @@ import Medal_start1 from "../assets/medalstar.png";
 import Medal1 from "../assets/medal.png";
 import clock from "../assets/Leading-icon.png";
 import timer from "../assets/timer.png";
-import ball5 from "../assets/5balls/03.png";
 import hashtag from "../assets/hashtag.png";
 import gift from "../assets/gift.png";
 import FavoriteBalls from "./FavoriteBalls";
@@ -21,6 +20,40 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+
+import b1 from "../assets/5balls/01.png";
+import b2 from "../assets/5balls/02.png";
+import b3 from "../assets/5balls/03.png";
+import b4 from "../assets/5balls/04.png";
+import b5 from "../assets/5balls/05.png";
+import b6 from "../assets/5balls/6.svg";
+import b7 from "../assets/5balls/7.svg";
+import b8 from "../assets/5balls/8.svg";
+import b9 from "../assets/5balls/9.svg";
+import b10 from "../assets/5balls/10.svg";
+import b11 from "../assets/5balls/11.svg";
+import b12 from "../assets/5balls/12.svg";
+import b13 from "../assets/5balls/13.svg";
+import b14 from "../assets/5balls/14.svg";
+import b15 from "../assets/5balls/15.svg";
+
+const ballImages: { [key: string]: string } = {
+  "1": b1,
+  "2": b2,
+  "3": b3,
+  "4": b4,
+  "5": b5,
+  "6": b6,
+  "7": b7,
+  "8": b8,
+  "9": b9,
+  "10": b10,
+  "11": b11,
+  "12": b12,
+  "13": b13,
+  "14": b14,
+  "15": b15,
+};
 
 // 🟣 Weekly Points Graph (kept as you had it)
 const WeeklyPointsTrend = ({ graphData }: { graphData: any[] }) => {
@@ -204,8 +237,10 @@ interface UiTopFinisher extends Omit<ApiTopFinisher, 'iconType'> {
   icon: string; // The imported image path
 }
 
+
 export interface UiRace extends Omit<ApiRace, 'topFinishers'> {
   timeRange: string;
+  yourBallImage: string;
   topFinishers: UiTopFinisher[];
 }
 const formatTimeRange = (startMs: number, endMs: number): string => {
@@ -267,11 +302,12 @@ export default function RaceHistory() {
       const mappedRaces: UiRace[] = data.map((r) => ({
           ...r,
           timeRange: formatTimeRange(r.startTimestamp, r.endTimestamp),
+          yourBallImage: ballImages[r.yourBall] || "",
           // Map the backend data to UI structure
           topFinishers: r.topFinishers.map((f) => ({
               ...f,
-              // Logic to assign the correct imported image variable
-              icon: f.position === "1st" ? Crown1 : (f.position === "2nd" ? Medal_start1 : Medal1)
+              // Logic to assign the correct imported image variable check for 3rd position as well if no position then no icon
+              icon: f.position === "1st" ? Crown1 : (f.position === "2nd" ? Medal_start1 : (f.position === "3rd" ? Medal1 : "")),
           }))
         }));
 
@@ -435,7 +471,7 @@ export default function RaceHistory() {
                     <div className="flex flex-col items-start">
                         <div className="flex items-center gap-2">
                         <img src={hashtag} alt="#" className="w-5 h-5 object-contain" />
-                        <img src={ball5} alt="ball" className="w-5 h-5 object-contain" />
+                        <img src={race.yourBallImage} alt="ball" className="w-5 h-5 object-contain" />
                         </div>
                         <p className="text-xs text-gray-500 mt-1">Your ball</p>
                     </div>
@@ -460,7 +496,6 @@ export default function RaceHistory() {
                               {f.position} Position
                             </span>{" "}
                             <span className="text-gray-400">• {f.ball}</span>{" "}
-                            <span className="text-gray-400">• {f.time}</span>
                           </p>
                         </div>
 
