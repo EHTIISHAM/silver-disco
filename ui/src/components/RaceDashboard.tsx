@@ -13,6 +13,34 @@ import b2 from "../assets/5balls/02.png";
 import b3 from "../assets/5balls/03.png";
 import b4 from "../assets/5balls/04.png";
 import b5 from "../assets/5balls/05.png";
+import b6 from "../assets/5balls/6.svg";
+import b7 from "../assets/5balls/7.svg";
+import b8 from "../assets/5balls/8.svg";
+import b9 from "../assets/5balls/9.svg";
+import b10 from "../assets/5balls/10.svg";
+import b11 from "../assets/5balls/11.svg";
+import b12 from "../assets/5balls/12.svg";
+import b13 from "../assets/5balls/13.svg";
+import b14 from "../assets/5balls/14.svg";
+import b15 from "../assets/5balls/15.svg";
+
+const ballImages: { [key: string]: string } = {
+  "1": b1,
+  "2": b2,
+  "3": b3,
+  "4": b4,
+  "5": b5,
+  "6": b6,
+  "7": b7,
+  "8": b8,
+  "9": b9,
+  "10": b10,
+  "11": b11,
+  "12": b12,
+  "13": b13,
+  "14": b14,
+  "15": b15,
+};
 
 function getNextRaceStartTime(createdAt: number, timerTillNextRace?: number): string {
   const minutes = timerTillNextRace || 0;
@@ -90,7 +118,7 @@ const RaceDashboard: React.FC = () => {
   const fetchRecentRaces = async () => {
     try {
       console.log("🔄 Fetching leaderboard data...");
-      const res = await fetch(`${import.meta.env.VITE_SERVER_URL}/api/leaderboard?temp=false`);
+      const res = await fetch(`${import.meta.env.VITE_PY_SERVER_URL}/api/leaderboard/recent`);
 
 
       // Check if request failed
@@ -100,9 +128,11 @@ const RaceDashboard: React.FC = () => {
 
       const data = await res.json();
 
-      // If your backend sends { users: [...] }
-      if (data.users && Array.isArray(data.users)) {
-        setRecentRaces(data.users.slice(0, 3));
+      // If your backend sends [...] for recent
+      if (Array.isArray(data) && data.length > 0) {
+          
+          setRecentRaces(data.slice(0, 3));
+        
       } else {
         console.error("Unexpected data format");
       }
@@ -320,20 +350,27 @@ useEffect(() => {
                 <div className="flex items-center space-x-3">
                   <div>
                     <p className="text-sm">
-                      {race.raceId}
+                      {"#"}{race.raceId}
                     </p>
                    <p className="text-sm text-gray-400">
                       <span className="text-[#8b6fed] text-xs font-bold">Winner</span> •{" "}
-                      <span className="text-[#767676]">{race.username || "N/A"}</span> •{" "}
-                      <span className="text-[#767676]">{race.player}</span>
+                      <span className="text-[#767676]">{race.username || "No Winner"}</span>
                     </p>
 
                     <div className="mt-1 flex items-center space-x-2">
-                      <img src={b1} alt="Ball 1" className="w-5 h-5 object-contain" />
-                      <img src={b2} alt="Ball 2" className="w-5 h-5 object-contain" />
-                      <img src={b3} alt="Ball 3" className="w-5 h-5 object-contain" />
-                      <img src={b4} alt="Ball 4" className="w-5 h-5 object-contain" />
-                      <img src={b5} alt="Ball 5" className="w-5 h-5 object-contain" />
+                    {race.top5Balls && Array.isArray(race.top5Balls) ? (
+                            race.top5Balls.map((ballNum: number, bIndex: number) => (
+                                <img 
+                                key={bIndex} 
+                                // Convert number to string to match your image map keys
+                                src={ballImages[String(ballNum)]} 
+                                alt={`Ball ${ballNum}`} 
+                                className="w-5 h-5 object-contain" 
+                                />
+                            ))
+                            ) : (
+                            <span className="text-xs text-gray-500">No balls data</span>
+                            )}
                     </div>
 
                   </div>

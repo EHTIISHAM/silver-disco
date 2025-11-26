@@ -37,7 +37,8 @@ async def fetch_games_from_db():
         }).sort("createdAt", -1)
 
         games = await games_cursor.to_list(length=None)
-
+        # filter only games with Not Started status
+        games = [game for game in games if game.get("status") == "Not Started"]
         if not games:
             return {"games": []}
 

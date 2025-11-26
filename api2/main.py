@@ -37,7 +37,7 @@ DB_NAME = os.getenv("DB_NAME", "pinballrace_com")
 SECRET_KEY = os.getenv("SECRET_KEY", "supersecret")
 SESSION_EXPIRE_SECONDS = int(os.getenv("SESSION_EXPIRE_SECONDS", "86400"))
 
-POS_POINT = { "1": 25, "2": 10, "3": 5, "4": 1, "5": 1 , "6": 1, "7": 1, "8": 1, "9": 1, "10": 1 }
+POS_POINT = { "1": 20, "2": 10, "3": 5, "4": 1, "5": 1 , "6": 1, "7": 1, "8": 1, "9": 1, "10": 1 }
 
 app = FastAPI()
 app.add_middleware(
@@ -161,7 +161,7 @@ async def leaderboard_entry(current_game, rankings):
         "ballNumber": first_position_ball,
         "points": points,
         "position": 1,
-        "top10Balls": top_10_balls,
+        "top5Balls": top_10_balls,
         "races": races_played,
         "type": game_type,
         "winningStreak": winning_streak,
@@ -933,6 +933,34 @@ async def get_race_history(req: HistoryRequest):
 
     return races_data
 
+def fix_mongo_doc(doc: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Helper to convert MongoDB ObjectIds to strings 
+    so FastAPI can return valid JSON.
+    """
+    if doc.get("_id"):
+        doc["_id"] = str(doc["_id"])
+    if doc.get("gameId"):
+        doc["gameId"] = str(doc["gameId"])
+    return doc
+
+@app.get("/api/leaderboard/recent")
+async def get_recent_races():
+    try:
+        # 1. Find all documents
+        # 2. Sort by 'datePlayed' in Descending order (-1) means newest first
+        # 3. Limit to 4 results
+        cursor = db.leaderboard.find({}).sort("datePlayed", -1).limit(4)
+        
+        # Convert cursor to a list
+        recent_races = await cursor.to_list(length=4)
+        
+        # Clean up the ObjectIds and return
+        return [fix_mongo_doc(race) for race in recent_races]
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/prizes/delete")
 async def api_delete_prize(request: Request, prize_id: str = Form(...)):
     await require_login(request)
@@ -969,7 +997,7 @@ async def submit_rankings(rankings: Dict[str, int]):
                     # numberOfWins +1 if position is 1,2,3 and utc time now
                     user = await db.users.find_one({"$or": [{"_id": ObjectId(participant_id)}, {"email": participant_id}]})
                     if user:
-                        new_points = user.get("points", 0) + points
+                        new_points = user.get("total_points", 0) + points
                         await db.users.update_one(
                             {"_id": user["_id"]},
                             {"$set": {"total_points": new_points}}
