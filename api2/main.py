@@ -69,6 +69,7 @@ class HistoryRequest(BaseModel):
     userId: str
     limit: int = 10  # Default to last 10 races
     gameType: str = "All" # Optional filter
+    date: str = "today"  # Optional date filter
 
 class GameModel(BaseModel):
     gameType: str
@@ -625,12 +626,72 @@ async def user_stats(user_email_data: UserEmail):
 
     streak = user.get("winningStreak", 0)
 
+    now_ts = int(datetime.now(timezone.utc).timestamp())
+    weekly_points = [
+        p for p in points_list
+        if (ts := safe_ts(p.get("timestamp"))) is not None and now_ts - ts <= 7 * 24 * 60 * 60
+    ]
+    daily_points = {}
+    for p in weekly_points:
+        ts = safe_ts(p.get("timestamp"))
+        day = datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
+        daily_points[day] = daily_points.get(day, 0) + p.get("points", 0)
+    trend = []
+    for i in range(7):
+        day = (datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d")
+        trend.append({
+            "date": day,
+            "points": daily_points.get(day, 0)
+        })
+    # need to create points distribution over time based on timestamps and points matching race played to calculate 11+ position
+    # step 1 get list of points and race from user
+    point_entries = user.get("points", [])
+    # create a dict of points with timestamp as key
+    points_over_time = {}
+    for p in point_entries:
+        ts = safe_ts(p.get("timestamp"))
+        if ts is not None:
+            points_over_time[ts] = p.get("points", 0)
+
+    race_entries = user.get("racesPlayed", [])
+    points_dict_per_position = {}
+    for p in race_entries:
+        ts = safe_ts(p.get("timestamp"))
+        if ts is not None:
+            # get race
+            race = p.get("races", 0)
+            if race != 0:
+                # get points for race
+                points = points_over_time.get(ts, 0)
+                if points == 25:
+                    points_dict_per_position["1"] = points_dict_per_position.get("1", 0) + 1
+                elif points == 10:
+                    points_dict_per_position["2"] = points_dict_per_position.get("2", 0) + 1
+                elif points == 5:
+                    points_dict_per_position["3"] = points_dict_per_position.get("3", 0) + 1
+                elif points == 1:
+                    points_dict_per_position["4-10"] = points_dict_per_position.get("4-10", 0) + 1
+                else:
+                    points_dict_per_position["11+"] = points_dict_per_position.get("11+", 0) + 1
+        # favourite balls from racesPlayed get all the user_balls and count frequency
+        favorite_balls = {}
+        for r in race_entries:
+            ts = safe_ts(r.get("timestamp"))
+            if ts is not None:
+                balls = r.get("balls", [])
+                for b in balls:
+                    favorite_balls[b] = favorite_balls.get(b, 0) + 1
+        # create a list of top 5 favorite balls
+        favorite_balls_list = sorted(favorite_balls.items(), key=lambda x: x[1], reverse=True)[:5]
     return {
         "username": user.get("username"),
         "totalWins": total_wins,
         "totalRaces": total_races,
         "points": total_points,
         "streak": streak,
+        "weeklyTrend": list(reversed(trend)),  # reverse to have oldest first
+        "pointsOverTime": points_dict_per_position,
+        "favoriteBalls": favorite_balls_list
     }
 
 
@@ -703,6 +764,7 @@ def get_time_range(timeline: str):
     # convert start and end to int
     start = int(start.timestamp())
     end = int(end.timestamp())
+    print(f"Timeline '{timeline}' resolved to range {start} - {end}")
     return start, end
 
 
@@ -816,10 +878,16 @@ async def get_race_history(req: HistoryRequest):
     # Apply optional Game Type filter
     if req.gameType != "All":
         query["gameType"] = req.gameType
+    if req.date:
+        try:
+            start_t, end_t = get_time_range(req.date)
+            query["createdAt"] = {"$gte": start_t * 1000, "$lte": end_t * 1000}
+        except HTTPException as e:
+            raise HTTPException(400, f"Invalid date filter: {req.date}") from e
 
     # 2. Execute Query (Sort by newest first)
     cursor = db.games.find(query).sort("createdAt", -1).limit(req.limit)
-    
+
     races_data = []
 
     async for game in cursor:
@@ -1029,7 +1097,7 @@ async def submit_rankings(rankings: Dict[str, int]):
                         # increment the racesPlayed
                         await db.users.update_one(
                             {"_id": user["_id"]},
-                            {"$push": {"racesPlayed": {"races": 1, "timestamp": int(datetime.utcnow().timestamp())}}}
+                            {"$push": {"racesPlayed": {"races": 1,"raceId": current_game["_id"], "user_ball": participant.get("ball"), "timestamp": int(datetime.utcnow().timestamp())}}}
                         )
         await leaderboard_entry(current_game, rankings)
         # mark current game as Finished

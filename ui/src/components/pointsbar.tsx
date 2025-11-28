@@ -1,10 +1,10 @@
-const PointsDistribution = () => {
+const PointsDistribution = ( { pointsOverTime }: { pointsOverTime: { [key: string]: number } } ) => {
   const distributionData = [
-    { place: "1st Place", value: 80, max: 100 },
-    { place: "2nd Place", value: 70, max: 100 },
-    { place: "3rd Place", value: 30, max: 100 },
-    { place: "4-10th Place", value: 20, max: 100 },
-    { place: "11+ Place", value: 10, max: 100 },
+    { place: "1st Place", value: pointsOverTime["1"] || 0, max: 100 },
+    { place: "2nd Place", value: pointsOverTime["2"] || 0, max: 100 },
+    { place: "3rd Place", value: pointsOverTime["3"] || 0, max: 100 },
+    { place: "4-10th Place", value: pointsOverTime["4-10"] || 0, max: 100 },
+    { place: "11+ Place", value: pointsOverTime["11+"] || 0, max: 100 },
   ];
 
   return (

@@ -9,8 +9,8 @@ import timer from "../assets/timer.png";
 import hashtag from "../assets/hashtag.png";
 import gift from "../assets/gift.png";
 import FavoriteBalls from "./FavoriteBalls";
-import { useState, useEffect } from "react";
-import { ChevronDown } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { ChevronDown, CirclePlus } from "lucide-react";
 import {
   AreaChart,
   Area,
@@ -38,25 +38,40 @@ import b14 from "../assets/5balls/14.svg";
 import b15 from "../assets/5balls/15.svg";
 
 const ballImages: { [key: string]: string } = {
-  "1": b1,
-  "2": b2,
-  "3": b3,
-  "4": b4,
-  "5": b5,
-  "6": b6,
-  "7": b7,
-  "8": b8,
-  "9": b9,
-  "10": b10,
-  "11": b11,
-  "12": b12,
-  "13": b13,
-  "14": b14,
-  "15": b15,
+  "Ball 1": b1,
+  "Ball 2": b2,
+  "Ball 3": b3,
+  "Ball 4": b4,
+  "Ball 5": b5,
+  "Ball 6": b6,
+  "Ball 7": b7,
+  "Ball 8": b8,
+  "Ball 9": b9,
+  "Ball 10": b10,
+  "Ball 11": b11,
+  "Ball 12": b12,
+  "Ball 13": b13,
+  "Ball 14": b14,
+  "Ball 15": b15,
 };
 
 // 🟣 Weekly Points Graph (kept as you had it)
 const WeeklyPointsTrend = ({ graphData }: { graphData: any[] }) => {
+  // 1. Process data to add the "Day" name (Mon, Tue, etc.)
+  console.log("Graph Data Received:", graphData);
+  const formattedData = useMemo(() => {
+    return graphData.map((item) => {
+      const dateObj = new Date(item.date);
+      return {
+        ...item,
+        // Convert "2025-11-21" -> "Fri"
+        dayName: dateObj.toLocaleDateString("en-US", { weekday: "short" }),
+        // Format date for Tooltip (optional, e.g., "Nov 21")
+        displayDate: dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      };
+    });
+  }, [graphData]);
+
   return (
     <div className="w-full max-w-md bg-[#121212] rounded-xl p-4 shadow-lg mt-6">
       <h3 className="text-white font-semibold text-lg mb-4">
@@ -65,7 +80,7 @@ const WeeklyPointsTrend = ({ graphData }: { graphData: any[] }) => {
       <div style={{ width: "100%", height: 250 }}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
-            data={graphData}
+            data={formattedData}
             margin={{
               top: 10,
               right: 10,
@@ -78,30 +93,43 @@ const WeeklyPointsTrend = ({ graphData }: { graphData: any[] }) => {
               vertical={false}
               strokeDasharray="3 3"
             />
+            
+            {/* 2. Changed dataKey to "dayName" to show Fri, Sat, Sun... */}
             <XAxis
-              dataKey="name"
+              dataKey="dayName" 
               stroke="#888888"
               fontSize={12}
               tickLine={false}
               axisLine={false}
             />
+            
             <YAxis
               stroke="#888888"
               fontSize={12}
               tickLine={false}
               axisLine={false}
-              domain={[0, "dataMax + 50"]}
+              domain={[0, "dataMax + 50"]} // Ensures the graph isn't flat if values are low
               tickFormatter={(tick: number) => tick.toString()}
             />
+            
             <Tooltip
               contentStyle={{
                 backgroundColor: "#1e1e24",
                 border: "1px solid #444",
                 borderRadius: "8px",
               }}
-              labelStyle={{ color: "#ffffff" }}
-              formatter={(value: number) => [`${value} Points`, ""]}
+              labelStyle={{ color: "#ffffff", marginBottom: "0.2rem" }}
+              itemStyle={{ color: "#8b5cf6" }}
+              // 3. Custom formatter to show readable Date in tooltip
+              labelFormatter={(label, payload) => {
+                 if (payload && payload.length > 0) {
+                    return payload[0].payload.displayDate; // Shows "Nov 21" instead of "Fri"
+                 }
+                 return label;
+              }}
+              formatter={(value: number) => [`${value} Points`, "Points"]}
             />
+            
             <Area
               type="monotone"
               dataKey="points"
@@ -117,6 +145,11 @@ const WeeklyPointsTrend = ({ graphData }: { graphData: any[] }) => {
   );
 };
 
+interface WeeklyPoint {
+  date: string;
+  points: number;
+}
+
 // 🟣 Performance Stats (kept logic)
 const PerformanceStats = () => {
   const [stats, setStats] = useState({
@@ -124,26 +157,46 @@ const PerformanceStats = () => {
     totalPoints: 0,
     totalWins: 0,
     finishRate: 0,
-    weeklyPoints: [],
+    weeklyPoints: [] as WeeklyPoint[],
+    pointsOverTime: {},
+    favoriteBalls: [1, 2, 3, 4, 5],
   });
 
   const [loading, setLoading] = useState(true);
+  const [, setUserData] = useState<UserData | null>(null);
 
   useEffect(() => {
     async function fetchStats() {
-      try {
-        const res = await fetch("/api/user/stats", {
-          method: "GET",
-          credentials: "include",
-        });
-        const data = await res.json();
-        if (res.ok || res.status === 200) {
+    try {
+      // Fetch user info
+      const userRes = await fetch(`${import.meta.env.VITE_SERVER_URL}/api/user/me`, {
+        credentials: "include",
+      });
+      const userJson = await userRes.json();
+      if (userJson.user) setUserData(userJson.user);
+
+      // Fetch stats for logged-in usersendinf useremail
+      const statsRes = await fetch(`${import.meta.env.VITE_PY_SERVER_URL}/api/user/stats`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: userJson.user._id }),
+      });
+      const data = await statsRes.json();
+
+        if (statsRes.ok || statsRes.status === 200) {
           setStats({
             totalRaces: data.totalRaces ?? 0,
-            totalPoints: data.totalPoints ?? 0,
+            totalPoints: data.points ?? 0,
             totalWins: data.totalWins ?? 0,
-            finishRate: data.finishRate ?? 0,
-            weeklyPoints: data.weeklyPoints ?? [],
+            // calculate finish rate as percentage using totalwins/totalraces * 100
+            finishRate: data.totalRaces
+              ? Math.round((data.totalWins / data.totalRaces) * 100)
+              : 0,
+            weeklyPoints: data.weeklyTrend ?? [],
+            pointsOverTime: data.pointsOverTime ?? {},
+            favoriteBalls: data.favoriteBalls ?? [1],
           });
         } else {
           console.error("Failed to fetch stats:", data);
@@ -200,10 +253,10 @@ const PerformanceStats = () => {
       <WeeklyPointsTrend graphData={stats.weeklyPoints} />
 
       <div className="w-full max-w-md mt-6">
-        <PointsDistribution />
+        <PointsDistribution pointsOverTime={stats.pointsOverTime} />
       </div>
       <div className="w-full max-w-md mt-6">
-        <FavoriteBalls />
+        <FavoriteBalls balls={stats.favoriteBalls} />
       </div>
     </div>
   );
@@ -264,6 +317,7 @@ export default function RaceHistory() {
   const [selectedGameType, setSelectedGameType] = useState("All");
   const [showGameTypeOptions, setShowGameTypeOptions] = useState(false);
   const [, setUserData] = useState<UserData>({});
+  const [userId, setUserId] = useState<string | null>(null);
   const dateOptions = [
     "Today",
     "Yesterday",
@@ -275,49 +329,78 @@ export default function RaceHistory() {
     "Custom date",
   ];
 
-  const gameTypeOptions = ["Regular", "Lottery", "Elimination"];
-  // using use effect fect users data from api already done in account.tsx
+  const gameTypeOptions = ["All", "Regular", "Lottery", "Elimination"];
+// 2. EFFECT 1: Fetch User Data ONLY (Runs once on mount)
   useEffect(() => {
-  const fetchUserAndRace = async () => {
-    try {
-      // Fetch user info
-      const userRes = await fetch(`${import.meta.env.VITE_SERVER_URL}/api/user/me`, {
-        credentials: "include",
-      });
-      const userJson = await userRes.json();
-      const user_id = userJson.user?._id;
-      const username = userJson.user?.username;
-      const email = userJson.user?.email;
-      setUserData({ user: { _id: user_id, username, email } });
+    const fetchUser = async () => {
+      try {
+        const userRes = await fetch(`${import.meta.env.VITE_SERVER_URL}/api/user/me`, {
+          credentials: "include",
+        });
+        const userJson = await userRes.json();
+        const fetchedUserId = userJson.user?._id;
+        
+        // Save user data
+        setUserData({ 
+          user: { 
+            _id: fetchedUserId, 
+            username: userJson.user?.username, 
+            email: userJson.user?.email 
+          } 
+        });
+        
+        // Set the ID to trigger the second effect
+        if (fetchedUserId) setUserId(fetchedUserId);
+        
+      } catch (error) {
+        console.error("Error fetching user:", error);
+      }
+    };
+    fetchUser();
+  }, []); // Empty array = runs once
 
-      const raceRes = await fetch(`${import.meta.env.VITE_PY_SERVER_URL}/api/user/race-history`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ userId: user_id ,limit: 100,gameType: selectedGameType}),
-      });
-      if (!raceRes.ok) throw new Error("Network response was not ok");
-      const data = await raceRes.json() as ApiRace[];      
-      const mappedRaces: UiRace[] = data.map((r) => ({
+  // 3. EFFECT 2: Fetch Races (Runs when userId, Date, or GameType changes)
+  useEffect(() => {
+    // If we don't have a user ID yet, don't run this
+    if (!userId) return;
+
+    const fetchRaces = async () => {
+      try {
+        const raceRes = await fetch(`${import.meta.env.VITE_PY_SERVER_URL}/api/user/race-history`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          // Use the state variables here
+          body: JSON.stringify({ 
+            userId: userId, 
+            limit: 100, 
+            gameType: selectedGameType, 
+            date: selectedDate 
+          }),
+        });
+
+        if (!raceRes.ok) throw new Error("Network response was not ok");
+        const data = await raceRes.json() as ApiRace[];      
+        
+        const mappedRaces: UiRace[] = data.map((r) => ({
           ...r,
           timeRange: formatTimeRange(r.startTimestamp, r.endTimestamp),
           yourBallImage: ballImages[r.yourBall] || "",
-          // Map the backend data to UI structure
           topFinishers: r.topFinishers.map((f) => ({
               ...f,
-              // Logic to assign the correct imported image variable check for 3rd position as well if no position then no icon
               icon: f.position === "1st" ? Crown1 : (f.position === "2nd" ? Medal_start1 : (f.position === "3rd" ? Medal1 : "")),
           }))
         }));
 
         setRaces(mappedRaces);
-    } catch (error) {
-      console.error("Error fetching user or stats:", error);
-    }
-  };
-  fetchUserAndRace();
-}, []);
+      } catch (error) {
+        console.error("Error fetching races:", error);
+      }
+    };
+
+    fetchRaces();
+  }, [userId, selectedGameType, selectedDate]); // 👈 Triggers refetch when these change
 
 
   return (
@@ -471,7 +554,16 @@ export default function RaceHistory() {
                     <div className="flex flex-col items-start">
                         <div className="flex items-center gap-2">
                         <img src={hashtag} alt="#" className="w-5 h-5 object-contain" />
-                        <img src={race.yourBallImage} alt="ball" className="w-5 h-5 object-contain" />
+                        {/* if race.yourBallImage == "" then load circlePlus */}
+                        {race.yourBallImage ? (
+                        <img 
+                            src={race.yourBallImage} 
+                            alt="ball" 
+                            className="w-5 h-5 object-contain" 
+                        />
+                        ) : (
+                        <CirclePlus className="w-5 h-5" />
+                        )}
                         </div>
                         <p className="text-xs text-gray-500 mt-1">Your ball</p>
                     </div>
@@ -500,11 +592,13 @@ export default function RaceHistory() {
                         </div>
 
                         {/* show the imported icon image */}
+                        {f.icon && (
                         <img
-                          src={f.icon}
-                          alt={`${f.name}-icon`}
-                          className="w-6 h-6 object-contain"
+                            src={f.icon}
+                            alt={`${f.name}-icon`}
+                            className="w-6 h-6 object-contain"
                         />
+                        )}
                       </div>
                     ))}
                   </div>
