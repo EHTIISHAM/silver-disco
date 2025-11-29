@@ -274,7 +274,7 @@ interface ApiTopFinisher {
   position: string;
   time: string;
   ball: string;
-  iconType: string; // "crown" | "medal"
+  iconType: string;
 }
 interface ApiRace {
   id: string;

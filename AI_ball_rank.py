@@ -16,6 +16,7 @@ CONFIG_FILE = "config.json"
 default_config = {
     "model_path": "ball_model.pt",
     "camera_index": 0,
+    "door_camera_index": 1,
     "api_url": "http://localhost:5000/submit_rankings"
 }
 
@@ -44,6 +45,73 @@ def rank_balls_left_to_right(ball_detections):
     ball_rankings = {ball["name"]: idx + 1 for idx, ball in enumerate(sorted_balls)}
 
     return ball_rankings
+
+
+class DoorMonitorThread(threading.Thread):
+    def __init__(self, camera_index):
+        super().__init__()
+        self.camera_index = int(camera_index)
+        self.running = True
+        self.paused = False
+        self.status = "UNKNOWN"
+        self.color = "#000000" # Black
+        
+    def run(self):
+        while self.running:
+            if self.paused:
+                time.sleep(0.5)
+                continue
+
+            try:
+                cap = cv2.VideoCapture(self.camera_index)
+                if not cap.isOpened():
+                    self.status = "CAM ERROR"
+                    self.color = "#FFA500" # Orange
+                    time.sleep(2)
+                    continue
+
+                ret, frame = cap.read()
+                cap.release() # Release immediately to allow other processes to use it if needed
+
+                if ret:
+                    # --- DETECTION LOGIC ---
+                    # 1. ROI [y1:y2, x1:x2]
+                    roi = frame[210:350, 260:800] 
+
+                    # 2. Pre-process
+                    gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+                    blurred_roi = cv2.GaussianBlur(gray_roi, (5, 5), 0)
+                    edges = cv2.Canny(blurred_roi, 50, 150)
+                    
+                    # 3. Count
+                    edge_pixel_count = cv2.countNonZero(edges)
+                    
+                    # 4. Threshold Logic
+                    threshold = 500 
+                    
+                    if edge_pixel_count > threshold:
+                        self.status = "CLOSED"
+                        self.color = "#FF0000" # Red
+                    else:
+                        self.status = "OPEN"
+                        self.color = "#008000" # Green
+                else:
+                    self.status = "NO FRAME"
+                    self.color = "#FFA500"
+
+            except Exception as e:
+                print(f"Door Thread Error: {e}")
+                self.status = "ERROR"
+            
+            # Sleep for 1 second before next check
+            time.sleep(1)
+
+    def stop(self):
+        self.running = False
+        
+    def set_pause(self, val):
+        self.paused = val
+
 # ---------------- MAIN DETECTION LOGIC ----------------
 class DetectorThread(threading.Thread):
     def __init__(self, config, log_callback, stop_event):
@@ -196,7 +264,57 @@ class DetectorThread(threading.Thread):
         cap.release()
         cv2.destroyAllWindows()
         self.log("Detection stopped.")
+    
+    def door_status_detector(self):
+        try:
+            cap = cv2.VideoCapture(self.config["door_camera_index"])
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
 
+                # 1. DEFINE REGION OF INTEREST (ROI)
+                # You need to tweak these numbers based on your actual camera position
+                # Format: [y1:y2, x1:x2]
+                # Focusing on the area where "CHOOSE" is written
+                roi = frame[210:350, 260:800] 
+
+                # 2. PRE-PROCESSING
+                gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+                
+                # Optional: Gaussian Blur to remove camera noise (as you suggested)
+                blurred_roi = cv2.GaussianBlur(gray_roi, (5, 5), 0)
+
+                # 3. EDGE DETECTION
+                # Thresholds 50 and 150 usually work well for black text on white
+                edges = cv2.Canny(blurred_roi, 50, 150)
+
+                # 4. DECISION LOGIC
+                # Count how many pixels are "edges"
+                edge_pixel_count = cv2.countNonZero(edges)
+
+                # Determine state based on a threshold you find by testing
+                # If text is there, count will be high (e.g., > 1000)
+                # If wall is there, count will be low (e.g., < 100)
+                threshold = 500 
+                
+                status = "OPEN"
+                color = "#008000" # Green for open
+                
+                if edge_pixel_count > threshold:
+                    status = "CLOSED"
+                    color = "#FF0000" # Red for closed
+
+                if cv2.waitKey(30) & 0xFF == ord('q'):
+                    break
+
+            cap.release()
+            cv2.destroyAllWindows()
+        except :
+            self.log(f"Door detection error")
+            status = "UNKNOWN"
+            color = "#FFFF00" # Yellow for unknown
+        return status, color
 # ---------------- TKINTER UI ----------------
 class DetectionApp:
     def __init__(self, root):
@@ -207,8 +325,12 @@ class DetectionApp:
         self.stop_event = threading.Event()
         self.detector_thread = None
 
-        self.build_ui()
+        self.door_thread = DoorMonitorThread(self.config["door_camera_index"])
+        self.door_thread.start()
 
+        self.build_ui()
+        # Start polling the DoorMonitorThread for status updates (door monitor already started)
+        self.update_door_ui()
     def build_ui(self):
         tab_control = ttk.Notebook(self.root)
         self.tab_main = ttk.Frame(tab_control)
@@ -221,9 +343,12 @@ class DetectionApp:
         # Main Tab
         ttk.Button(self.tab_main, text="Start Detection", command=self.start_detection).pack(pady=10)
         ttk.Button(self.tab_main, text="Stop Detection", command=self.stop_detection).pack(pady=5)
+        # add live text for door status
+        self.door_status_label = tk.Label(self.tab_main, text="Door Status: INITIALIZING", font=("Helvetica", 16, "bold"))
+        self.door_status_label.pack(pady=10)
+        
         self.log_box = scrolledtext.ScrolledText(self.tab_main, width=80, height=20, state="disabled")
         self.log_box.pack(padx=10, pady=10)
-
         # Settings Tab
         ttk.Label(self.tab_settings, text="Model Path:").pack(pady=5)
         self.model_entry = ttk.Entry(self.tab_settings, width=60)
@@ -236,6 +361,14 @@ class DetectionApp:
         self.camera_entry = ttk.Entry(self.tab_settings, width=10)
         self.camera_entry.insert(0, str(self.config["camera_index"]))
         self.camera_entry.pack(pady=5)
+
+        ttk.Label(self.tab_settings, text="Door Camera Index:").pack(pady=5)
+        self.door_camera_entry = ttk.Entry(self.tab_settings, width=10)
+        self.door_camera_entry.insert(0, str(self.config["door_camera_index"]))
+        self.door_camera_entry.pack(pady=5)
+        
+        # PREVIEW BUTTON
+        ttk.Button(self.tab_settings, text="Preview Door Camera (5s)", command=self.preview_door_camera).pack(pady=10)
 
         ttk.Label(self.tab_settings, text="API URL:").pack(pady=5)
         self.api_entry = ttk.Entry(self.tab_settings, width=60)
@@ -274,9 +407,77 @@ class DetectionApp:
         self.log_box.insert(tk.END, f"{time.strftime('%H:%M:%S')} | {message}\n")
         self.log_box.configure(state="disabled")
         self.log_box.yview(tk.END)
+    
+    def update_door_status(self):
+        status, color_hex = self.detector_thread.door_status_detector()
+        # color code to color
 
+        self.door_status_label.config(text=f"Door Status: {status}", foreground=color_hex)
+        self.root.after(1000, self.update_door_status)  # Update every 2 seconds
+
+    def update_door_ui(self):
+        """ Polls the door thread for status updates """
+        if self.door_thread:
+            text = f"Door Status: {self.door_thread.status}"
+            color = self.door_thread.color
+            
+            # Update label
+            self.door_status_label.config(text=text, fg=color)
+        
+        # Re-run this function after 1000ms (1 second)
+        self.root.after(1000, self.update_door_ui)
+
+    def preview_door_camera(self):
+        """ Temporarily pauses monitoring to show a live feed for setup """
+        # 1. Pause the background monitor so it releases the camera
+        self.door_thread.set_pause(True)
+        self.log("Opening Door Preview...")
+        
+        # 2. Run Preview in a separate thread so GUI doesn't freeze
+        threading.Thread(target=self._run_preview_loop).start()
+
+    def _run_preview_loop(self):
+        try:
+            cam_idx = int(self.door_camera_entry.get())
+            cap = cv2.VideoCapture(cam_idx)
+            start_time = time.time()
+            
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                
+                # Draw the ROI Box so user knows where detection happens
+                # ROI matches the one in DoorMonitorThread: [210:350, 260:800]
+                cv2.rectangle(frame, (260, 210), (800, 350), (0, 255, 255), 2)
+                cv2.putText(frame, "DETECTION AREA", (260, 205), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,255,255), 2)
+                
+                # Calc countdown
+                elapsed = time.time() - start_time
+                remaining = 5 - int(elapsed)
+                cv2.putText(frame, f"Closing in {remaining}s... (Press Q to close)", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,255), 2)
+
+                cv2.imshow("Door Camera Preview", frame)
+                
+                # Exit conditions: 'q' pressed or 5 seconds passed
+                if cv2.waitKey(1) & 0xFF == ord('q') or elapsed > 5:
+                    break
+            
+            cap.release()
+            cv2.destroyAllWindows()
+            
+        except Exception as e:
+            print(f"Preview Error: {e}")
+        finally:
+            # 3. Resume background monitoring
+            self.door_thread.set_pause(False)
+    def on_close(self):
+        self.stop_event.set()
+        self.door_thread.stop()
+        self.root.destroy()
 # ---------------- RUN APP ----------------
 if __name__ == "__main__":
     root = tk.Tk()
     app = DetectionApp(root)
+    root.protocol("WM_DELETE_WINDOW", app.on_close)
     root.mainloop()

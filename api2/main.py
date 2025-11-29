@@ -1114,6 +1114,17 @@ async def submit_rankings(rankings: Dict[str, int]):
     return {"status": "success", "message": "Rankings received"}
 
 
+@app.delete("/api/account/deletion?user_id={ID}")
+def account_deletion(user_id: str):
+    # add a tag in user_id where deletion_requested: true deletion_requested_at: timestamp
+    try:
+        db.users.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": {"deletion_requested": True, "deletion_requested_at": int(datetime.utcnow().timestamp())}}
+        )
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 # ---------- Startup: ensure counters exist ----------
 @app.on_event("startup")
 async def startup_event():

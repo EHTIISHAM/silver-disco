@@ -2,8 +2,13 @@
 import { useState } from "react";
 import { Edit2, Eye, EyeOff, Trash2 } from "lucide-react";
 
-const SecuritySettings: React.FC = () => {
-  const [password, setPassword] = useState("a_secret_password");
+
+interface SecuritySettingsProps {
+  id: string;
+}
+
+const SecuritySettings = ({ id }: SecuritySettingsProps) => {
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   const handleDeleteAccount = () => {
@@ -11,9 +16,27 @@ const SecuritySettings: React.FC = () => {
       window.confirm(
         "Are you absolutely sure you want to delete your account? This action is irreversible."
       )
+      // once confirmed send request to delete account
     ) {
-      alert("Account deletion initiated.");
-      // API call for account deletion can be added here
+        if (id) {
+                fetch(`/api/account/deletion?user_id=${id}`, { method: "DELETE" })
+                    .then((response) => {
+                        if (response.ok) {
+                            alert("Account deleted Initially. it will take up to 30 days to be fully removed.");
+                            // Optionally, redirect the user or update the UI
+                        } else {
+                            alert("Failed to delete account. Please try again later.");
+                        }
+                    })
+                    .catch((error) => {
+                        console.error("Error deleting account:", error);
+                        alert("An error occurred. Please try again later.");
+                    });
+            } else {
+                alert("User data is not available. Cannot delete account.");
+            }
+      // proceed with deletion logic
+      // ...
     }
   };
 

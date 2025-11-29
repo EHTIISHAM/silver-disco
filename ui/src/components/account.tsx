@@ -39,6 +39,7 @@ interface ConnectedAccount {
 }
 
 interface UserData {
+  _id: string;
   username?: string;
   email?: string;
   clientToken?: string;
@@ -57,7 +58,6 @@ interface StatsData {
   finishRate?: number;
   weeklyPoints: { name: string; points: number }[];
 }
-
 
 
 const AccountScreen: React.FC = () => {
@@ -118,7 +118,7 @@ const AccountScreen: React.FC = () => {
   };
 
   fetchUserAndStats();
-}, []);
+}, [ serverUrl ]);
 
 
   // Handle connect/disconnect actions
@@ -313,10 +313,10 @@ const AccountScreen: React.FC = () => {
       {activeTab === "Notifications" && <NotificationSettings />}
 
       {/* Security */}
-      {activeTab === "Security" && <SecuritySettings />}
+      {activeTab === "Security" && <SecuritySettings id={userData._id} />}
 
       {/* Edit Profile Modal */}
-      {showModal && <EditProfileModal onClose={() => setShowModal(false)} onUpdate={() => setShowModal(false)} />}
+      {showModal && <EditProfileModal onClose={() => setShowModal(false)} onUpdate={() => setShowModal(false)} userData={userData} />}
     </div>
   );
 };

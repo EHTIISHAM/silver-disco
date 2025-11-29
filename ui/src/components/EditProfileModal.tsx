@@ -1,11 +1,29 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, User } from "lucide-react";
 
-const EditProfileModal = ({ onClose = () => {}, onUpdate = () => {} }) => {
-  const [userName] = useState("PinballPro");
-  const [displayName, setDisplayName] = useState("PinballPro");
-  const [email, setEmail] = useState("pinballpro2@gmail.com");
+interface UserData {
+  _id: string;
+  username?: string;
+  email?: string;
+  clientToken?: string;
+  connectedAccounts?: {
+    google: boolean;
+    tiktok: boolean;
+    twitch: boolean;
+  };
+}
+
+const EditProfileModal = ({ onClose = () => {}, onUpdate = () => {}, userData }: { onClose?: () => void; onUpdate?: () => void; userData: UserData }) => {
+  const [userName] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [email, setEmail] = useState("");
+
+  useEffect(() => {
+
+    setDisplayName(userData.username ?? "");
+    setEmail(userData.email ?? "");
+  }, [userData]);
 
   const handleUpdate = () => {
     onUpdate();
