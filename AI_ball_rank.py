@@ -15,8 +15,8 @@ CONFIG_FILE = "config.json"
 # ---------------- CONFIG HANDLING ----------------
 default_config = {
     "model_path": "ball_model.pt",
-    "camera_index": 0,
-    "door_camera_index": 1,
+    "camera_index": 1,
+    "door_camera_index": 0,
     "api_url": "https://admin.pinballrace.com/submit_rankings"
 }
 
@@ -111,6 +111,9 @@ class DoorMonitorThread(threading.Thread):
         
     def set_pause(self, val):
         self.paused = val
+    
+    def update_camera_index(self, new_index):
+        self.camera_index = int(new_index)
 
 # ---------------- MAIN DETECTION LOGIC ----------------
 class DetectorThread(threading.Thread):
@@ -387,6 +390,9 @@ class DetectionApp:
         self.config["model_path"] = self.model_entry.get()
         self.config["camera_index"] = self.camera_entry.get()
         self.config["api_url"] = self.api_entry.get()
+        self.config["door_camera_index"] = self.door_camera_entry.get()
+        # Update door thread camera index
+        self.door_thread.update_camera_index(self.config["door_camera_index"])
         save_config(self.config)
         messagebox.showinfo("Settings", "Settings saved successfully!")
 
@@ -412,11 +418,18 @@ class DetectionApp:
         status, color_hex = self.detector_thread.door_status_detector()
         # send to api
         try:
-            response = requests.post("https://admin.pinballrace.com/api/door/status", json={"status": status})
-            if response.status_code == 200:
-                self.log(f"Door status '{status}' sent to API successfully.")
+            response1 = requests.post("https://admin.pinballrace.com/api/game_ongoing")
+            if response1.status_code == 200:
+                if response1.json().get("status", False):
+                    response = requests.post("https://admin.pinballrace.com/api/door/status", json={"status": status})
+                    if response.status_code == 200:
+                        self.log(f"Door status '{status}' sent to API successfully.")
+                    else:
+                        self.log(f"Failed to send door status to API: {response.status_code}")
+                else:
+                    self.log("No ongoing game. Door status not sent.")
             else:
-                self.log(f"Failed to send door status to API: {response.status_code}")
+                self.log(f"Failed to check ongoing game status: {response1.status_code}")
         except Exception as e:
             self.log(f"Error sending door status to API: {e}")
 
@@ -431,7 +444,9 @@ class DetectionApp:
             
             # Update label
             self.door_status_label.config(text=text, fg=color)
-        
+        else:
+            self.log("Door thread not initialized.")
+            self.door_status_label.config(text="Door Status: UNKNOWN", fg="#FFFF00")
         # Re-run this function after 1000ms (1 second)
         self.root.after(1000, self.update_door_ui)
 

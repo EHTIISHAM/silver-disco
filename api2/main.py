@@ -1114,6 +1114,16 @@ async def api_delete_prize(request: Request, prize_id: str = Form(...)):
     await require_login(request)
     await db.prizes.delete_one({"_id": ObjectId(prize_id)})
     return RedirectResponse("/dashboard", status_code=303)
+
+@app.post("/api/game_ongoing")
+async def game_ongoing():
+    # this will be called by the detection script to check if a game is ongoing and no startedAt timestamp exists
+    current_game = await db.games.find_one({"status": "Ongoing", "startedAt": {"$exists": False}})
+    if current_game:
+        return {"status": True}
+    else:
+        return {"status": False}
+
 @app.post("/api/door/status")
 async def door_status(status: DoorStatus):
     # this will receive the door status from the detection script
