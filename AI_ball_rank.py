@@ -17,7 +17,7 @@ default_config = {
     "model_path": "ball_model.pt",
     "camera_index": 0,
     "door_camera_index": 1,
-    "api_url": "http://localhost:5000/submit_rankings"
+    "api_url": "https://admin.pinballrace.com/submit_rankings"
 }
 
 def load_config():
@@ -298,11 +298,11 @@ class DetectorThread(threading.Thread):
                 # If wall is there, count will be low (e.g., < 100)
                 threshold = 500 
                 
-                status = "OPEN"
+                status = "opened"
                 color = "#008000" # Green for open
                 
                 if edge_pixel_count > threshold:
-                    status = "CLOSED"
+                    status = "closed"
                     color = "#FF0000" # Red for closed
 
                 if cv2.waitKey(30) & 0xFF == ord('q'):
@@ -410,7 +410,15 @@ class DetectionApp:
     
     def update_door_status(self):
         status, color_hex = self.detector_thread.door_status_detector()
-        # color code to color
+        # send to api
+        try:
+            response = requests.post("https://admin.pinballrace.com/api/door/status", json={"status": status})
+            if response.status_code == 200:
+                self.log(f"Door status '{status}' sent to API successfully.")
+            else:
+                self.log(f"Failed to send door status to API: {response.status_code}")
+        except Exception as e:
+            self.log(f"Error sending door status to API: {e}")
 
         self.door_status_label.config(text=f"Door Status: {status}", foreground=color_hex)
         self.root.after(1000, self.update_door_status)  # Update every 2 seconds

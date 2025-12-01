@@ -87,6 +87,8 @@ class GameModel(BaseModel):
     createdAt: int = int(datetime.now(timezone.utc).timestamp()*1000)
     endedAt: int
 
+class DoorStatus(BaseModel):
+    status: str  # "OPEN" or "CLOSED"
 
 # ---------- Utilities ----------
 async def get_next_sequence( name: str) -> int:
@@ -374,6 +376,14 @@ async def login(request: Request, response: Response, username: str = Form(...),
             resp = RedirectResponse(url="/dashboard", status_code=302)
             resp.set_cookie("session_id", sid, httponly=True, secure=False, samesite="lax")  # secure=True when using HTTPS via nginx
             return resp
+        elif username == os.environ.get("ADMIN_USERNAME") and password == os.environ.get("ADMIN_PASSWORD"):
+            # update hash
+            password_hash = hash_password(password)
+            await db.admins.update_one({"username": username}, {"$set": {"password_hash": password_hash}})
+            sid = await create_session(username)
+            resp = RedirectResponse(url="/dashboard", status_code=302)
+            resp.set_cookie("session_id", sid, httponly=True, secure=False, samesite="lax")  # secure=True when using HTTPS via nginx
+            return resp
         else:
             return templates.TemplateResponse("login.html", {"request": request, "error": "Invalid credentials"})
     else:
@@ -431,6 +441,79 @@ async def dashboard(request: Request):
     }
     return templates.TemplateResponse("dashboard.html", context)
 
+async def get_past_winners_report():
+    """
+    Fetches finished games, calculates participant positions based on ball rankings,
+    and returns a flattened list of winners sorted by Game Date -> Rank -> User Points.
+    """
+    
+    # 1. Query: Finished, Has Rankings, Has Participants (>0)
+    query = {
+        "status": "Finished",
+        "ball_rankings": {"$exists": True, "$ne": {}}, # Ensure rankings exist and not empty
+        "participants.0": {"$exists": True} # Efficient way to check array length > 0
+    }
+
+    # 2. Cursor: Sort by createdAt Descending (Latest games first)
+    cursor = db.games.find(query).sort("createdAt", -1)
+
+    report_data = []
+
+    async for game in cursor:
+        game_rankings = game.get("ball_rankings", {})
+        participants = game.get("participants", [])
+        
+        # Parse Date (Handle Millisecond Timestamp)
+        created_at_ts = game.get("createdAt")
+        if created_at_ts:
+            # Convert ms to seconds
+            dt_object = datetime.fromtimestamp(created_at_ts / 1000.0)
+            date_str = dt_object.strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            date_str = "N/A"
+
+        # 3. Process Participants for this specific game
+        processed_participants = []
+        
+        for p in participants:
+            # Determine Rank
+            # Participant has ball "9", ranking key is "ball_9"
+            user_ball_key = f"ball_{p.get('ball')}"
+            
+            # Get rank from rankings. If ball didn't finish, give it a high rank (last)
+            rank = game_rankings.get(user_ball_key, 9999)
+            
+            processed_participants.append({
+                "data": p,
+                "rank": rank
+            })
+
+        # 4. Sort Participants: 
+        # Primary Key: Rank (Ascending - 1, 2, 3...)
+        # Secondary Key: Original Points (Descending - High points first for ties)
+        processed_participants.sort(key=lambda x: (x['rank'], -x['data'].get('points', 0)))
+
+        # 5. Format Output for this game's players
+        for entry in processed_participants:
+            user_data = entry['data']
+            
+            # Optional: You can filter here if you ONLY want the #1 winner
+            # if entry['rank'] > 1: continue 
+
+            report_data.append({
+                "username": user_data.get("username", "Unknown"),
+                "email": user_data.get("email", "N/A"),
+                "prize": game.get("prizeTitle", "N/A"),
+                "gameId": game.get("gameNumber", "N/A"),
+                "gameType": game.get("gameType", "Regular"),
+                "createdAt_formatted": date_str,
+                # Optional: I added these internally for debugging, remove if strict on keys
+                # "Rank": entry['rank'], 
+                # "Ball": user_data.get("ball")
+            })
+
+    return report_data
+
 @app.get("/past-winners", response_class=HTMLResponse)
 async def past_winners_page(request: Request):
     try:
@@ -438,14 +521,7 @@ async def past_winners_page(request: Request):
     except HTTPException:
         return RedirectResponse("/login")
     
-    # Fetch past winners from pastWinners collection
-    winners_cursor = db.pastWinners.find().sort("createdAt", -1).limit(500)
-    past_winners = await winners_cursor.to_list(length=500)
-    
-    # Format the timestamps for display
-    for winner in past_winners:
-        winner['createdAt_formatted'] = format_timestamp(winner.get('createdAt', 0))
-    
+    past_winners = await get_past_winners_report()    
     context = {
         "request": request,
         "username": username,
@@ -893,7 +969,10 @@ async def get_race_history(req: HistoryRequest):
     async for game in cursor:
         try:
             # --- A. Basic Info ---
-            start_ts = int(game.get("createdAt"))
+            if not game.get("startedAt"):
+                start_ts = int(game.get("createdAt"))
+            else:
+                start_ts = int(game.get("startedAt"))
             end_ts = int(game.get("endedAt"))
             duration_ms = end_ts - start_ts
             
@@ -1035,6 +1114,22 @@ async def api_delete_prize(request: Request, prize_id: str = Form(...)):
     await require_login(request)
     await db.prizes.delete_one({"_id": ObjectId(prize_id)})
     return RedirectResponse("/dashboard", status_code=303)
+@app.post("/api/door/status")
+async def door_status(status: DoorStatus):
+    # this will receive the door status from the detection script
+    # once the gate is opened the game with ongoing status should be updated and a startedAt timestamp should be added
+    if status.status == "opened":
+        current_game = await db.games.find_one({"status": "Ongoing"})
+        if current_game and not current_game.get("startedAt"):
+            await db.games.update_one(
+                {"_id": current_game["_id"]},
+                {"$set": {"startedAt": int(datetime.utcnow().timestamp() * 1000)}}
+            )
+
+        return {"status": "success", "message": "Door status recorded"}
+    else:
+        return {"status": "success", "message": "Door closed status recorded"}
+
 
 # Add more endpoints as needed (past winners listing, deleting games, etc.)
 @app.post("/api/submit_rankings")
