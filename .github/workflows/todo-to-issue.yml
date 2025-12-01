@@ -1,0 +1,19 @@
+name: TODO to Issue
+
+on:
+  push:
+    branches:
+      - "**"
+
+jobs:
+  todo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Convert TODO comments to Issues
+        uses: alstr/todo-to-issue-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          autoAssign: true
+          commentOnIssues: true
