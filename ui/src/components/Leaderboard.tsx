@@ -148,6 +148,8 @@ useEffect(() => {
           }}
         >
           {/* Header with Dropdown */}
+          {/* TODO: Implement Custom Date Picker */}
+
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-white font-semibold text-xl text-left">Leaderboard</h2>
 
