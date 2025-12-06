@@ -16,7 +16,7 @@ from typing import Optional, List, Dict, Any
 
 from urllib3 import request
 from bson import ObjectId
-from fastapi import FastAPI, Request, Form, Response, HTTPException, BackgroundTasks, Depends
+from fastapi import FastAPI, Request, Form, Response, HTTPException, BackgroundTasks, Depends, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -89,6 +89,30 @@ class GameModel(BaseModel):
 
 class DoorStatus(BaseModel):
     status: str  # "OPEN" or "CLOSED"
+
+
+@app.post("/api/games/offline")
+async def create_offline_game(
+    game_video: UploadFile = File(...),
+    results_frame: UploadFile = File(...),
+    gameType: str = Form(...),
+    prize: str = Form(...)
+):
+    # 1. Read files
+    video_bytes = await game_video.read()
+    frame_bytes = await results_frame.read()
+    
+    # 2. Save files to your storage/static folder
+    # with open(f"static/videos/{game_video.filename}", "wb") as f:
+    #     f.write(video_bytes)
+
+    # 3. Process Logic
+    print(f"Processing Offline Game: Type={gameType}, Prize={prize}")
+    print(f"Video: {game_video.filename}, Frame: {results_frame.filename}")
+
+    # 4. Return Redirect or JSON
+    # return RedirectResponse(url="/dashboard", status_code=303)
+    return {"status": "success", "message": "Offline game uploading"}
 
 # ---------- Utilities ----------
 async def get_next_sequence( name: str) -> int:
