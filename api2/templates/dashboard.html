@@ -107,6 +107,67 @@
       </fieldset>
     </div>
 
+    </fieldset>
+    </div>
+
+    <div class="card admin-card" style="margin-top: 20px; margin-bottom: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h3>Offline Games</h3>
+        <button type="button" id="toggleOfflineBtn" class="create-btn" style="background-color: #4b5563;">
+          Open Offline Module
+        </button>
+      </div>
+
+      <div id="offlineFormContainer" style="display: none; margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px;">
+        <form method="post" action="/api/games/offline" enctype="multipart/form-data">
+          
+          <div class="cards-row">
+            
+            <div style="flex: 1; padding-right: 20px;">
+              <div class="form-group">
+                <label>Upload Game Video:</label>
+                <input type="file" name="game_video" accept="video/*" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+              </div>
+
+              <div class="form-group" style="margin-top: 15px;">
+                <label>Upload Results Frame:</label>
+                <input type="file" name="results_frame" accept="image/*" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+              </div>
+            </div>
+
+            <div style="flex: 1;">
+              
+              <div class="form-group">
+                <label>Game Type:</label>
+                <div class="button-group" id="offlineGameTypeGroup">
+                  <input type="radio" id="offlineRegular" name="gameType" value="Regular" checked hidden>
+                  <input type="radio" id="offlineLottery" name="gameType" value="Lottery" hidden>
+                  <input type="radio" id="offlineElimination" name="gameType" value="Elimination" hidden>
+                  
+                  <button type="button" class="toggle-btn active" onclick="selectOfflineType('Regular', this)">Regular</button>
+                  <button type="button" class="toggle-btn" onclick="selectOfflineType('Lottery', this)">Lottery</button>
+                  <button type="button" class="toggle-btn" onclick="selectOfflineType('Elimination', this)">Elimination</button>
+                </div>
+              </div>
+
+              <div class="form-group" style="margin-top: 15px;">
+                <label>Reward:</label>
+                <input type="text" value="Points Only" disabled style="width: 100%; background: #f3f4f6; border: 1px solid #ddd; color: #666; cursor: not-allowed;">
+                <input type="hidden" name="prize" value="Points Only">
+              </div>
+
+            </div>
+          </div>
+
+          <div style="margin-top: 20px; text-align: right;">
+            <button type="submit" class="create-btn">UPLOAD & PROCESS</button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+    <section>
+
     <!-- Prizes Section -->
     <section>
       <h3>Prizes</h3>
@@ -207,6 +268,35 @@
     }
   }
 
+  // Toggle the Offline Form visibility
+  const toggleBtn = document.getElementById('toggleOfflineBtn');
+  const formContainer = document.getElementById('offlineFormContainer');
+
+  if(toggleBtn && formContainer) {
+    toggleBtn.addEventListener('click', () => {
+      if (formContainer.style.display === 'none') {
+        formContainer.style.display = 'block';
+        toggleBtn.textContent = 'Close Offline Module';
+      } else {
+        formContainer.style.display = 'none';
+        toggleBtn.textContent = 'Open Offline Module';
+      }
+    });
+  }
+
+  // Function to handle Offline Game Type selection
+  function selectOfflineType(value, btnElement) {
+    // 1. Update Hidden Radios
+    const radioId = 'offline' + value;
+    document.getElementById(radioId).checked = true;
+
+    // 2. Update Visual Classes
+    const group = document.getElementById('offlineGameTypeGroup');
+    const buttons = group.querySelectorAll('.toggle-btn');
+    
+    buttons.forEach(btn => btn.classList.remove('active'));
+    btnElement.classList.add('active');
+  }
   // Run every 5 seconds
   setInterval(refreshGameStatus, 5000);
   document.addEventListener("DOMContentLoaded", refreshGameStatus);
