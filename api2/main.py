@@ -90,6 +90,42 @@ class GameModel(BaseModel):
 class DoorStatus(BaseModel):
     status: str  # "OPEN" or "CLOSED"
 
+# a path to stream video based on _id input
+@app.get("/api/videos/{video_id}")
+async def stream_video(video_id: str):
+    video_path = f"videos/{video_id}_video.mp4"
+    if not os.path.exists(video_path):
+        raise HTTPException(status_code=404, detail="Video not found")
+    def iterfile():
+        with open(video_path, mode="rb") as file_like:
+            yield from file_like
+    return Response(iterfile(), media_type="video/mp4")
+
+# path to take userid and add participant to offline game and return the video link
+@app.post("/api/games/offline/join")
+async def join_offline_game(
+    request: Request,
+    userId: str = Form(...),
+    ball: str = Form(...)
+):
+    # get a random offline game
+    offline_game = await db.games_off.find_one({})
+    if not offline_game:
+        raise HTTPException(status_code=404, detail="No offline game available")
+    # get user details
+    user = await db.users.find_one({"_id": ObjectId(userId)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    # add participant to offline game
+    participant = {
+        "participantId": str(user["_id"]),
+        "username": user.get("username", "Unknown"),
+        "ball": ball,
+        "points": 0
+    }
+    await db.games_off.update_one({"_id": offline_game["_id"]}, {"$push": {"participants": participant}})
+    video_link = f"/api/videos/{offline_game['_id']}"
+    return {"video_link": video_link}
 
 @app.post("/api/games/offline")
 async def create_offline_game(
@@ -273,8 +309,15 @@ async def scheduler():
         for og in offline_games:
             created_at = datetime.utcfromtimestamp(og["createdAt"] / 1000)
             if created_at < seven_days_ago:
+                # get the deleted _id and delete the video and frame files too
                 await db.games_off.delete_one({"_id": og["_id"]})
-        
+                video_path = og.get("video_path")
+                frame_path = og.get("frame_path")   
+                if video_path and os.path.exists(video_path):
+                    os.remove(video_path)
+                if frame_path and os.path.exists(frame_path):
+                    os.remove(frame_path)
+                
         if not games:
             await asyncio.sleep(30)
             continue
