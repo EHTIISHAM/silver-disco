@@ -101,18 +101,35 @@ async def create_offline_game(
     # 1. Read files
     video_bytes = await game_video.read()
     frame_bytes = await results_frame.read()
-    
-    # 2. Save files to your storage/static folder
-    # with open(f"static/videos/{game_video.filename}", "wb") as f:
-    #     f.write(video_bytes)
+    # create an empty entry in games_off collection and get the _id back
+    result = await db.games_off.insert_one({})
+    game_id = result.inserted_id
+    # save the video and frame in videos folder and the name will be _id
+    video_path = f"videos/{game_id}_video.mp4"
+    frame_path = f"videos/{game_id}_frame.png"
 
-    # 3. Process Logic
+    # TODO: using frame need to get ball rankings
+
+    with open(video_path, "wb") as video_file:
+        video_file.write(video_bytes)
+
+    with open(frame_path, "wb") as frame_file:
+        frame_file.write(frame_bytes)
+    time_now = int(datetime.utcnow().timestamp() * 1000)
+
+    await db.games_off.update_one({"_id": game_id}, {"$set": {
+        "gameType": gameType,
+        "prize": prize,
+        "video_path": video_path,
+        "frame_path": frame_path,
+        "rankings": {},
+        "participants": [],
+        "createdAt": time_now
+    }})
     print(f"Processing Offline Game: Type={gameType}, Prize={prize}")
     print(f"Video: {game_video.filename}, Frame: {results_frame.filename}")
 
-    # 4. Return Redirect or JSON
-    # return RedirectResponse(url="/dashboard", status_code=303)
-    return {"status": "success", "message": "Offline game uploading"}
+    return RedirectResponse(url="/dashboard", status_code=303)
 
 # ---------- Utilities ----------
 async def get_next_sequence( name: str) -> int:
@@ -248,7 +265,16 @@ async def scheduler():
         # 1️⃣ Fetch all 'Not Started' games in order
         games_cursor = db.games.find({"status": "Not Started"}).sort("createdAt", 1)
         games = await games_cursor.to_list(length=None)
-
+        # fetch offline games too
+        offline_games_cursor = db.games_off.find().sort("createdAt", 1)
+        # delete the games that are older than 7 day
+        offline_games = await offline_games_cursor.to_list(length=None)
+        seven_days_ago = datetime.utcnow() - timedelta(days=7)
+        for og in offline_games:
+            created_at = datetime.utcfromtimestamp(og["createdAt"] / 1000)
+            if created_at < seven_days_ago:
+                await db.games_off.delete_one({"_id": og["_id"]})
+        
         if not games:
             await asyncio.sleep(30)
             continue
