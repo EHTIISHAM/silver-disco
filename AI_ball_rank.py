@@ -178,7 +178,6 @@ class DetectorThread(threading.Thread):
             start_y = max((h - new_h) // 2, 0)
             frame = frame[start_y:start_y + new_h, start_x:start_x + new_w]
             results = model(frame, conf=0.5)
-            self.log(frame.shape)
             boxes = results[0].boxes.xywh.cpu().numpy() if results[0].boxes is not None else []
             names = results[0].names
             cls = results[0].boxes.cls.cpu().numpy().astype(int) if results[0].boxes is not None else []
@@ -212,7 +211,6 @@ class DetectorThread(threading.Thread):
                 x_center = (first_ball["box"]["x2"] + first_ball["box"]["x1"]) / 2
                 frame_center = frame.shape[1] / 2
                 position = "Left Side" if x_center < frame_center else "Right Side"
-                self.log(f"Detected {first_ball['name']} on {position}")
             else:
                 self.log("No balls detected")
 

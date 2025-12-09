@@ -26,6 +26,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from passlib.hash import bcrypt
 from pydantic import BaseModel
 from dotenv import load_dotenv
+import json
 
 from utils.utils import router as utils_router
 
@@ -130,43 +131,56 @@ async def join_offline_game(
 @app.post("/api/games/offline")
 async def create_offline_game(
     game_video: UploadFile = File(...),
-    results_frame: UploadFile = File(...),
+    result_dict: str = Form(...),
     gameType: str = Form(...),
     prize: str = Form(...)
 ):
     # 1. Read files
     video_bytes = await game_video.read()
-    frame_bytes = await results_frame.read()
     # create an empty entry in games_off collection and get the _id back
     result = await db.games_off.insert_one({})
     game_id = result.inserted_id
     # save the video and frame in videos folder and the name will be _id
     video_path = f"videos/{game_id}_video.mp4"
-    frame_path = f"videos/{game_id}_frame.png"
 
-    # TODO: using frame need to get ball rankings
+    # convert result_dict string to dictionary 
+    # if '' is used instead of "" in json then replace them
+    result_dict = json.loads(result_dict.replace("'", "\""))
 
     with open(video_path, "wb") as video_file:
         video_file.write(video_bytes)
 
-    with open(frame_path, "wb") as frame_file:
-        frame_file.write(frame_bytes)
+
     time_now = int(datetime.utcnow().timestamp() * 1000)
 
     await db.games_off.update_one({"_id": game_id}, {"$set": {
         "gameType": gameType,
         "prize": prize,
         "video_path": video_path,
-        "frame_path": frame_path,
-        "rankings": {},
+        "rankings": result_dict,
         "participants": [],
         "createdAt": time_now
     }})
     print(f"Processing Offline Game: Type={gameType}, Prize={prize}")
-    print(f"Video: {game_video.filename}, Frame: {results_frame.filename}")
+    print(f"Video: {game_video.filename}")
 
     return RedirectResponse(url="/dashboard", status_code=303)
 
+@app.post("/api/games/offline/delete")
+async def delete_offline_game(
+    request: Request,
+    game_id: str = Form(...)
+):
+    await require_login(request)
+    offline_game = await db.games_off.find_one({"_id": ObjectId(game_id)})
+    if not offline_game:
+        raise HTTPException(status_code=404, detail="Offline game not found")
+    # delete video file too
+    video_path = offline_game.get("video_path")
+    if video_path and os.path.exists(video_path):
+        os.remove(video_path)
+    await db.games_off.delete_one({"_id": ObjectId(game_id)})
+    return RedirectResponse(url="/dashboard", status_code=303)
 # ---------- Utilities ----------
 async def get_next_sequence( name: str) -> int:
     """Auto-increment counter that resets daily."""
@@ -307,16 +321,16 @@ async def scheduler():
         offline_games = await offline_games_cursor.to_list(length=None)
         seven_days_ago = datetime.utcnow() - timedelta(days=7)
         for og in offline_games:
+            # check if the og is empty or not
+            if og.get('createdAt', None) is None:
+                continue
             created_at = datetime.utcfromtimestamp(og["createdAt"] / 1000)
             if created_at < seven_days_ago:
                 # get the deleted _id and delete the video and frame files too
                 await db.games_off.delete_one({"_id": og["_id"]})
                 video_path = og.get("video_path")
-                frame_path = og.get("frame_path")   
                 if video_path and os.path.exists(video_path):
                     os.remove(video_path)
-                if frame_path and os.path.exists(frame_path):
-                    os.remove(frame_path)
                 
         if not games:
             await asyncio.sleep(30)
@@ -525,10 +539,18 @@ async def dashboard(request: Request):
     prizes = await db.prizes.find().to_list(length=1000)
     next_game = await db.games.find_one({"status": "Not Started"}, sort=[("createdAt", 1)])
     current_game = await db.games.find_one({"status": "Ongoing"}, sort=[("createdAt", 1)])
+    off_games = await db.games_off.find().to_list(length=1000)
+    # in off_games change the timestamp to actaual date also remove empty createdAt entries
+    for og in off_games:
+        if "createdAt" in og:
+            og["createdAt_formatted"] = format_timestamp(og["createdAt"])
+        else:
+            off_games.remove(og)
     context = {
         "request": request,
         "username": username,
         "prizes": prizes,
+        "offGames": off_games,
         "nextGame": next_game,
         "currentGame": current_game,
     }

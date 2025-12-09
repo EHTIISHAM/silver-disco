@@ -301,6 +301,17 @@ button:disabled {
   background-color: #dc2626;
 }
 
+.create-btn{
+  background-color: #1d4ed8; /* blue */
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.create-btn:hover{
+    background-color: #1e40af;
+}
 /* ---------------------------------- */
 /* 5. Tables                          */
 /* ---------------------------------- */
