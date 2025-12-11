@@ -9,8 +9,21 @@ import AccountScreen from "../../../components/account";
 
 type ActiveTab = "Home" | "Winners" | "Data" | "Profile";
 
+interface UserData {
+  _id: string;
+  username?: string;
+  email?: string;
+  clientToken?: string;
+  connectedAccounts?: {
+    google: boolean;
+    tiktok: boolean;
+    twitch: boolean;
+  };
+}
+
 const PinballRaceHome: React.FC = () => {
   // ✅ Load saved tab from localStorage, or default to "Home"
+  const [user_data, setUserData] = useState<UserData | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
     const savedTab = localStorage.getItem("activeTab") as ActiveTab | null;
     return savedTab || "Home";
@@ -54,7 +67,10 @@ const PinballRaceHome: React.FC = () => {
 
     fetchUser();
   }, []);
-// add a button that will call offline game when cliecked call api that will return offline game url and open it in new tab
+// add a button that will call offline game when cliecked call join race model but the ball selected will be for offline game
+// that ball selected will be sent to offline game and the user will be able to play offline game with that ball
+// returning the url from the backend and opening it in a new tab
+// max games per day is 3 
   return (
     <div className="bg-black min-h-screen text-white pb-24 flex flex-col">
       <PinballRaceHeader username={user.username} pfp={user.pfp} />
@@ -67,18 +83,27 @@ const PinballRaceHome: React.FC = () => {
             <button
               onClick={async () => {
                 try {
-                  const serverUrl =
-                    import.meta.env.VITE_SERVER_URL || "http://localhost:3000";
-                  const res = await fetch(`${serverUrl}/offline_game_url`, {
-                    credentials: "include",
-                  });
+                    // Fetch user info
+                    const userRes = await fetch(`${import.meta.env.VITE_SERVER_URL}/api/user/me`, {
+                        credentials: "include",
+                    });
+                    const userJson = await userRes.json();
+                    if (userJson.user) setUserData(userJson.user);
+                    const response = await fetch(`${import.meta.env.VITE_PY_SERVER_URL}/api/games/offline/url`, {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                      },
+                      body: JSON.stringify({ userId: user_data?._id }),
+                      credentials: "include",
+                    });
 
-                  if (!res.ok) {
-                    console.warn("⚠️ Failed to fetch offline game URL:", res.status);
+                  if (!response.ok) {
+                    console.warn("⚠️ Failed to fetch offline game URL:", response.status);
                     return;
                   }
 
-                  const data = await res.json();
+                  const data = await response.json();
                   const offlineGameUrl = data.url;
 
                   if (offlineGameUrl) {

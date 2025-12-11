@@ -166,6 +166,22 @@ async def create_offline_game(
 
     return RedirectResponse(url="/dashboard", status_code=303)
 
+# it will receive credentials and return a random offline game url
+@app.post("/api/games/offline/url")
+async def get_offline_game_url(
+    request: Request,
+    userId: str = Form(...),
+):
+    await require_login(request)
+    # get a random offline game where createdAt is not None and check if user_id is in participant
+    # fetch games where user is not a participant
+    offline_game = await db.games_off.find_one({"createdAt": {"$ne": None}, "participants.participantId": {"$ne": userId}})
+    if not offline_game:
+        raise HTTPException(status_code=404, detail="No offline game available")
+    # sadd the user 
+    # check for 
+    video_link = f"/api/videos/{offline_game['_id']}"
+    return {"video_link": video_link}
 @app.post("/api/games/offline/delete")
 async def delete_offline_game(
     request: Request,
