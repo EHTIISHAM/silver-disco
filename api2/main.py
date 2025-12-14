@@ -38,7 +38,7 @@ DB_NAME = os.getenv("DB_NAME", "pinballrace_com")
 SECRET_KEY = os.getenv("SECRET_KEY", "supersecret")
 SESSION_EXPIRE_SECONDS = int(os.getenv("SESSION_EXPIRE_SECONDS", "86400"))
 
-POS_POINT = { "1": 20, "2": 10, "3": 5, "4": 1, "5": 1 , "6": 1, "7": 1, "8": 1, "9": 1, "10": 1 }
+POS_POINT = { "1": 20, "2": 10, "3": 5, "4": 1, "5": 1 , "6": 1, "7": 1, "8": 1, "9": 1, "10": 1 ,"0":0}
 
 app = FastAPI()
 app.add_middleware(
@@ -166,11 +166,27 @@ async def create_offline_game(
 
     return RedirectResponse(url="/dashboard", status_code=303)
 
+# fnction taht will take user_ID and off_game id and then automatically add the 
+async def process_off_game(game_id,user_id,ball_id):
+    # first find the game
+    game = await db.games_off.find_one({"_id":ObjectId(game_id)})
+    user = await db.users.find_one({"_id":ObjectId(user_id)})
+    # fetch the rankings
+    user_points = POS_POINT[str(game["rankings"].get("ball_"+ball_id,0))]
+
+    parti_dict = {"userId": user_id,
+                  "username": user["username"],
+                  "ball": str(ball_id),
+                  }
+
+    # get the points 
+
 # it will receive credentials and return a random offline game url
 @app.post("/api/games/offline/url")
 async def get_offline_game_url(
     request: Request,
     userId: str = Form(...),
+    ball_id: int = Form(...)
 ):
     await require_login(request)
     # get a random offline game where createdAt is not None and check if user_id is in participant
