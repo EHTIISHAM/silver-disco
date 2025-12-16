@@ -16,8 +16,8 @@ from typing import Optional, List, Dict, Any
 
 from urllib3 import request
 from bson import ObjectId
-from fastapi import FastAPI, Request, Form, Response, HTTPException, BackgroundTasks, Depends, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi import FastAPI, Request, Form, Response, HTTPException, Query, Depends, UploadFile, File
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -27,6 +27,7 @@ from passlib.hash import bcrypt
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import json
+from jose import jwt, JWTError
 
 from utils.utils import router as utils_router
 
@@ -37,7 +38,9 @@ MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
 DB_NAME = os.getenv("DB_NAME", "pinballrace_com")
 SECRET_KEY = os.getenv("SECRET_KEY", "supersecret")
 SESSION_EXPIRE_SECONDS = int(os.getenv("SESSION_EXPIRE_SECONDS", "86400"))
-
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 5
+CHUNK_SIZE = 1024 * 1024
 POS_POINT = { "1": 20, "2": 10, "3": 5, "4": 1, "5": 1 , "6": 1, "7": 1, "8": 1, "9": 1, "10": 1 ,"0":0}
 
 app = FastAPI()
@@ -92,41 +95,7 @@ class DoorStatus(BaseModel):
     status: str  # "OPEN" or "CLOSED"
 
 # a path to stream video based on _id input
-@app.get("/api/videos/{video_id}")
-async def stream_video(video_id: str):
-    video_path = f"videos/{video_id}_video.mp4"
-    if not os.path.exists(video_path):
-        raise HTTPException(status_code=404, detail="Video not found")
-    def iterfile():
-        with open(video_path, mode="rb") as file_like:
-            yield from file_like
-    return Response(iterfile(), media_type="video/mp4")
 
-# path to take userid and add participant to offline game and return the video link
-@app.post("/api/games/offline/join")
-async def join_offline_game(
-    request: Request,
-    userId: str = Form(...),
-    ball: str = Form(...)
-):
-    # get a random offline game
-    offline_game = await db.games_off.find_one({})
-    if not offline_game:
-        raise HTTPException(status_code=404, detail="No offline game available")
-    # get user details
-    user = await db.users.find_one({"_id": ObjectId(userId)})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    # add participant to offline game
-    participant = {
-        "participantId": str(user["_id"]),
-        "username": user.get("username", "Unknown"),
-        "ball": ball,
-        "points": 0
-    }
-    await db.games_off.update_one({"_id": offline_game["_id"]}, {"$push": {"participants": participant}})
-    video_link = f"/api/videos/{offline_game['_id']}"
-    return {"video_link": video_link}
 
 @app.post("/api/games/offline")
 async def create_offline_game(
@@ -135,8 +104,6 @@ async def create_offline_game(
     gameType: str = Form(...),
     prize: str = Form(...)
 ):
-    # 1. Read files
-    video_bytes = await game_video.read()
     # create an empty entry in games_off collection and get the _id back
     result = await db.games_off.insert_one({})
     game_id = result.inserted_id
@@ -147,9 +114,10 @@ async def create_offline_game(
     # if '' is used instead of "" in json then replace them
     result_dict = json.loads(result_dict.replace("'", "\""))
 
-    with open(video_path, "wb") as video_file:
-        video_file.write(video_bytes)
-
+    with open(video_path, "wb") as buffer:
+        # Loop until the file is fully read
+        while content := await game_video.read(CHUNK_SIZE):
+            buffer.write(content)
 
     time_now = int(datetime.utcnow().timestamp() * 1000)
 
@@ -166,6 +134,58 @@ async def create_offline_game(
 
     return RedirectResponse(url="/dashboard", status_code=303)
 
+def create_secure_video_link(video_id: str, user_id: str):
+    """
+    Generates a token containing the video_id and user_id.
+    Returns the full URL endpoint with the token.
+    """
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    
+    # We pack the data into the token
+    to_encode = {
+        "sub": user_id,          # Subject (User ID)
+        "vid": video_id,         # Custom field for Video ID
+        "exp": expire            # Expiration time
+    }
+    
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    
+    # NOTE: Update 'http://localhost:8000' to your actual domain
+    return f"https://admin.pinballrace.com/api/videos/secure-stream?token={encoded_jwt}"
+
+@app.get("/api/videos/secure-stream")
+async def secure_stream_video(token: str = Query(...)):
+    """
+    This endpoint does NOT take a video_id in the URL path.
+    It extracts it from the secure token.
+    """
+    try:
+        # Decode and verify the token
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        video_id = payload.get("vid")
+        _ = payload.get("sub")
+        
+        if video_id is None:
+            raise HTTPException(status_code=403, detail="Invalid token content")
+            
+    except JWTError:
+        # This catches expired tokens or fake signatures
+        raise HTTPException(status_code=403, detail="Link expired or invalid")
+
+    # Locate the file
+    video_path = f"videos/{video_id}_video.mp4"
+    
+    if not os.path.exists(video_path):
+        raise HTTPException(status_code=404, detail="Video file not found")
+
+    # Generator for streaming
+    def iterfile():
+        with open(video_path, mode="rb") as file_like:
+            yield from file_like
+
+    # Return the stream
+    return StreamingResponse(iterfile(), media_type="video/mp4")
+
 # fnction taht will take user_ID and off_game id and then automatically add the 
 async def process_off_game(game_id,user_id,ball_id):
     # first find the game
@@ -177,10 +197,39 @@ async def process_off_game(game_id,user_id,ball_id):
     parti_dict = {"userId": user_id,
                   "username": user["username"],
                   "ball": str(ball_id),
+                  "points": user_points,
+                  "rank": game["rankings"].get("ball_"+ball_id,999)
                   }
+    await db.games_off.update_one({"_id":ObjectId(game_id)},
+                                  {"$addToSet": {"participants": parti_dict}})
 
-    # get the points 
-
+    # update users data 
+    if user_points > 0:
+        await db.users.update_one(
+            {"_id": user["_id"]},
+            {"$push": {"points": {"points":user_points,"timestamp":int(datetime.utcnow().timestamp())}}}
+            )
+        new_points = user.get("total_points", 0) + user_points
+        await db.users.update_one(
+            {"_id": user["_id"]},
+            {"$set": {"total_points": new_points}}
+        )
+    if game["rankings"].get("ball_"+ball_id,0) in [1,2,3]:
+        await db.users.update_one(
+            {"_id": user["_id"]},
+            {"$push": {"numberOfWins": {"wins": 1, "timestamp": int(datetime.utcnow().timestamp())}}}
+        )
+        if game["rankings"].get("ball_"+ball_id,0) == 1:
+            new_streak = user.get("winningStreak", 0) + 1
+            await db.users.update_one(
+                {"_id": user["_id"]},
+                {"$set": {"winningStreak": new_streak}}
+            )
+    await db.users.update_one(
+        {"_id": user["_id"]},
+        {"$push": {"racesPlayed": {"races": 1,"raceId": "offline", "user_ball": str(ball_id), "timestamp": int(datetime.utcnow().timestamp())}}}
+    )
+    return str(game["rankings"].get("ball_"+ball_id,0)),user_points
 # it will receive credentials and return a random offline game url
 @app.post("/api/games/offline/url")
 async def get_offline_game_url(
@@ -188,16 +237,33 @@ async def get_offline_game_url(
     userId: str = Form(...),
     ball_id: int = Form(...)
 ):
-    await require_login(request)
-    # get a random offline game where createdAt is not None and check if user_id is in participant
-    # fetch games where user is not a participant
-    offline_game = await db.games_off.find_one({"createdAt": {"$ne": None}, "participants.participantId": {"$ne": userId}})
+    ranks, points = await require_login(request)
+    if ranks == None:
+        ranks = "10+"
+
+    pipeline = [
+        # 1. Filter: Same conditions as before
+        { "$match": { 
+            "createdAt": { "$ne": None }, 
+            "participants.userId": { "$ne": userId } 
+        }},
+        # 2. Random Sample: Pick 1 random document from the results
+        { "$sample": { "size": 1 } }
+    ]
+
+    # Execute aggregation
+    cursor = db.games_off.aggregate(pipeline)
+    offline_game = await cursor.to_list(length=1)
     if not offline_game:
         raise HTTPException(status_code=404, detail="No offline game available")
-    # sadd the user 
-    # check for 
-    video_link = f"/api/videos/{offline_game['_id']}"
-    return {"video_link": video_link}
+    await process_off_game(offline_game["_id"],userId,ball_id)
+    secure_link = create_secure_video_link(offline_game['_id'], userId)
+    return {"video_link": secure_link,
+            "user_ball":"ball_"+ ball_id,
+            "user_position":ranks,
+            "user_points":points}
+
+
 @app.post("/api/games/offline/delete")
 async def delete_offline_game(
     request: Request,
