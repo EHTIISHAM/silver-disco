@@ -258,7 +258,7 @@ async def get_offline_game_url(
     ranks, points = await process_off_game(offline_game[0]["_id"],game_data.userId,game_data.ball_id)
     if ranks == None:
         ranks = "10+"
-    secure_link = create_secure_video_link(offline_game['_id'], game_data.userId)
+    secure_link = create_secure_video_link(str(offline_game[0]['_id']), game_data.userId)
     return {"video_link": secure_link,
             "user_ball":"ball_"+ game_data.ball_id,
             "user_position":ranks,
