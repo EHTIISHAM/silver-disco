@@ -1,6 +1,7 @@
-import React, { useState,useEffect  } from "react";
-import { X } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { X, Play, SkipForward, Trophy, MapPin } from "lucide-react";
 
+// Import images (keeping your existing imports)
 import Ball1 from "../assets/balls/1.png";
 import Ball2 from "../assets/balls/2.png";
 import Ball3 from "../assets/balls/3.png";
@@ -32,159 +33,263 @@ interface JoinRaceModalProps {
   onClose: () => void;
 }
 
+// Define the structure of the API response
+interface OfflineGameResult {
+  video_link: string;
+  user_ball: string;
+  user_position: string;
+  user_points: number;
+}
+
+type ModalStep = 'select' | 'video' | 'result';
+
 const JoinRaceModal: React.FC<JoinRaceModalProps> = ({ onClose }) => {
+  // UI State
+  const [step, setStep] = useState<ModalStep>('select');
+  const [loading, setLoading] = useState(false);
+  
+  // Data State
   const [selectedBall, setSelectedBall] = useState<number | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const serverUrl = import.meta.env.VITE_PY_SERVER_URL;
-  const serverurl1 = import.meta.env.VITE_SERVER_URL
+  const [gameResult, setGameResult] = useState<OfflineGameResult | null>(null);
 
-  // Fetch user email on mount
-    useEffect(() => {
+  // Refs
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Env vars
+  const serverUrl = import.meta.env.VITE_PY_SERVER_URL;
+  const serverurl1 = import.meta.env.VITE_SERVER_URL;
+
+  // 1. Fetch User ID
+  useEffect(() => {
     const fetchUser = async () => {
-        try {
+      try {
         const res = await fetch(`${serverurl1}/api/user/me`, {
-            credentials: "include",
+          credentials: "include",
         });
         const data = await res.json();
         if (data?.user?._id) setUserId(data.user._id);
-        } catch (err) {
+      } catch (err) {
         console.error("Failed to fetch user:", err);
-        }
+      }
     };
     fetchUser();
-    }, [serverurl1]);
+  }, [serverurl1]);
 
-    const handleJoin = async () => {
+  // 2. Handle Join Logic
+  const handleJoin = async () => {
     if (!selectedBall || !userId) return;
+    setLoading(true);
 
     try {
-        const res = await fetch(
-        `${serverUrl}/api/games/offline/url`,{
+      const res = await fetch(`${serverUrl}/api/games/offline/url`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({userId:userId, ball_id: selectedBall})}
-        );
+        body: JSON.stringify({ userId: userId, ball_id: selectedBall }),
+      });
 
-if (!res.ok) {
+      if (!res.ok) {
         let errorDetail = "Failed to join race";
-        
-        // Attempt to parse the response body, which usually contains the error details (like the FastAPI 'detail')
         try {
-            const errorBody = await res.json();
-            // Assuming FastAPI error format { "detail": "User already joined the game" }
-            if (errorBody && errorBody.detail) {
-                errorDetail = errorBody.detail;
-            } else {
-                // Fallback for non-JSON or unexpected structure
-                errorDetail = `Server returned status ${res.status}`;
-            }
+          const errorBody = await res.json();
+          if (errorBody && errorBody.detail) errorDetail = errorBody.detail;
         } catch (e) {
-            // Handle case where response is not JSON (e.g., plain text 500 error)
-            errorDetail = `Request failed with status ${res.status}`;
+          errorDetail = `Server returned status ${res.status}`;
         }
-        
-        // Throw an error that contains the specific error message
-        throw new Error(errorDetail); 
+        throw new Error(errorDetail);
+      }
+
+      const result: OfflineGameResult = await res.json();
+      
+      // Store result and switch to video view
+      setGameResult(result);
+      setStep('video'); 
+      
+    } catch (err: any) {
+      alert(err.message || "Error Joining the Race");
+    } finally {
+      setLoading(false);
     }
-      const result = await res.json();
-      console.log("Joined successfully:", result);
-      alert("Successfully joined the race!");
-      onClose(); // Close modal after join
-    } catch (err) {
-        alert("Error Joining the Race")
-}
   };
-  return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm z-50">
-      <div className="bg-[#1a1a1a] w-[90%] sm:w-[420px] rounded-2xl shadow-xl overflow-hidden border border-gray-800">
-        {/* Header */}
-        <div className="flex justify-between items-center p-4 border-b border-gray-800 bg-[#1a1a1a]">
-          <div>
-            <h2 className="text-white font-semibold text-lg">Join race</h2>
-            <p className="text-gray-400 text-xs">
-              Select one ball (1–15) for race{" "}
-              {gameNumber}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white transition"
-          >
-            <X size={18} />
-          </button>
-        </div>
+
+  // 3. Helper to finish video (Watch complete or Skip)
+  const handleVideoComplete = () => {
+    setStep('result');
+  };
+
+  // --- RENDER HELPERS ---
+
+  const renderSelectionStep = () => (
+    <>
+      <div className="flex justify-between items-center p-4 border-b border-gray-800 bg-[#1a1a1a]">
         <div>
-        {/* Game Type */}
-        <div className="p-4 bg-[#1f1f1f] flex items-center justify-between">
-        {/* Left side */}
-        <div className="flex flex-col">
-          <h3 className="text-white-400 text-sm mb-1">Game type</h3>
-          <p className="text-gray-400 text-sm">Type chosen for your game is:</p>
+          <h2 className="text-white font-semibold text-lg">Join Offline Race</h2>
+          <p className="text-gray-400 text-xs">Select your ball (1–15)</p>
         </div>
+        <button onClick={onClose} className="text-gray-400 hover:text-white transition">
+          <X size={18} />
+        </button>
+      </div>
 
-        {/* Right side */}
-        <div className="flex items-center">
-          <span className="text-indigo-400 font-semibold text-base">{gameType}</span>
+      <div className="max-h-[60vh] overflow-y-auto custom-scrollbar">
+        <div className="grid grid-cols-5 gap-3 justify-items-center bg-[#1f1f1f] p-4">
+          {balls.map((ball) => (
+            <div
+              key={ball.id}
+              onClick={() => setSelectedBall(ball.id)}
+              className={`rounded-xl overflow-hidden cursor-pointer border-2 transition transform hover:scale-105
+                ${selectedBall === ball.id ? "border-indigo-500 shadow-lg shadow-indigo-500/20" : "border-transparent opacity-80 hover:opacity-100"}
+              `}
+            >
+              <img
+                src={ball.img}
+                alt={`Ball ${ball.id}`}
+                className="object-cover w-16 h-16 rounded-lg" // Adjusted slightly for cleaner grid
+              />
+            </div>
+          ))}
         </div>
-        </div>
- 
+      </div>
 
+      <div className="flex justify-end items-center p-4 border-t border-gray-800 bg-[#1a1a1a] space-x-4">
+        <button onClick={onClose} className="text-gray-400 hover:text-white transition text-sm font-medium">
+          Cancel
+        </button>
+        <button
+          className={`px-6 py-2 rounded-full font-semibold text-white transition flex items-center gap-2
+            ${selectedBall ? "bg-indigo-600 hover:bg-indigo-700" : "bg-gray-700 cursor-not-allowed"}
+          `}
+          disabled={!selectedBall || !userId || loading}
+          onClick={handleJoin}
+        >
+          {loading ? (
+            <span className="animate-pulse">Joining...</span>
+          ) : (
+            <>
+              Join Race <Play size={16} fill="currentColor" />
+            </>
+          )}
+        </button>
+      </div>
+    </>
+  );
 
-          {/* Ball Grid */}
-          <div className="grid grid-cols-5 gap-3 justify-items-center bg-[#1f1f1f] p-2 rounded-lg">
-            {balls.map((ball) => (
-              <div
-                key={ball.id}
-                onClick={() => setSelectedBall(ball.id)}
-                className={`rounded-xl overflow-hidden cursor-pointer border-2 transition 
-                  ${selectedBall === ball.id
-                    ? "border-white-500"
-                    : "border-transparent"
-                  }`}
-              >
-                <img
-                    src={ball.img}
-                    alt={`Ball ${ball.id}`}
-                    // Use the 16.5 classes for a precise match to 65.6px (66px)
-                    className="object-cover w-16.5 h-16.5 rounded-lg"
-                />
-              </div>
-            ))}
-          </div>
-        </div>
+  const renderVideoStep = () => (
+    <>
+      <div className="relative bg-black w-full aspect-video flex items-center justify-center">
+        {/* Close/Abort Button */}
+        <button 
+          onClick={onClose} 
+          className="absolute top-4 right-4 z-20 bg-black/50 p-1 rounded-full text-white hover:bg-red-600 transition"
+        >
+          <X size={20} />
+        </button>
 
-        {/* Footer */}
-        <div className="flex justify-end items-center p-4 border-t border-gray-800 bg-[#1a1a1a] space-x-4">
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white transition text-sm font-medium"
+        {gameResult?.video_link ? (
+          <video
+            ref={videoRef}
+            src={gameResult.video_link}
+            autoPlay
+            controls={false} // Hide default controls for a cleaner "game" feel, or set to true
+            onEnded={handleVideoComplete}
+            className="w-full h-full object-contain"
           >
-            Cancel
-          </button>
-          <button
-            className={`px-6 py-2 rounded-full font-semibold text-white transition 
-              ${selectedBall
-                ? "bg-indigo-600 hover:bg-indigo-700"
-                : "bg-gray-700 cursor-not-allowed"
-              }`}
-            disabled={!selectedBall || !userId}
-            onClick={handleJoin}
-          >
-            Join
-          </button>
+            Your browser does not support the video tag.
+          </video>
+        ) : (
+            <div className="text-white">Video not available</div>
+        )}
+      </div>
+
+      {/* Video Controls Footer */}
+      <div className="flex justify-between items-center p-4 border-t border-gray-800 bg-[#1a1a1a]">
+        <div className="text-gray-400 text-sm animate-pulse">
+            Watching race...
         </div>
+        <button
+          onClick={handleVideoComplete}
+          className="px-4 py-2 rounded-full bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium flex items-center gap-2 transition"
+        >
+          Skip to Results <SkipForward size={16} />
+        </button>
+      </div>
+    </>
+  );
+
+  const renderResultStep = () => (
+    <>
+      <div className="flex justify-between items-center p-4 border-b border-gray-800 bg-[#1a1a1a]">
+        <h2 className="text-white font-semibold text-lg">Race Results</h2>
+        <button onClick={onClose} className="text-gray-400 hover:text-white transition">
+          <X size={18} />
+        </button>
+      </div>
+
+      <div className="p-8 flex flex-col items-center justify-center space-y-6 bg-[#1f1f1f]">
+        
+        {/* Ball Image */}
+        <div className="relative">
+             <div className="absolute inset-0 bg-indigo-500 blur-xl opacity-30 rounded-full"></div>
+             {selectedBall && (
+                 <img 
+                    src={balls[selectedBall - 1].img} 
+                    alt="My Ball" 
+                    className="w-24 h-24 relative z-10 drop-shadow-2xl"
+                 />
+             )}
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 gap-4 w-full mt-4">
+            <div className="bg-[#1a1a1a] p-4 rounded-xl border border-gray-700 flex flex-col items-center">
+                <div className="flex items-center gap-2 text-gray-400 mb-1">
+                    <MapPin size={16} /> <span className="text-xs uppercase tracking-wider">Position</span>
+                </div>
+                <div className="text-2xl font-bold text-white">
+                    {gameResult?.user_position || "-"}
+                </div>
+            </div>
+
+            <div className="bg-[#1a1a1a] p-4 rounded-xl border border-gray-700 flex flex-col items-center">
+                <div className="flex items-center gap-2 text-yellow-500 mb-1">
+                    <Trophy size={16} /> <span className="text-xs uppercase tracking-wider text-gray-400">Points</span>
+                </div>
+                <div className="text-2xl font-bold text-yellow-400">
+                    +{gameResult?.user_points || 0}
+                </div>
+            </div>
+        </div>
+        
+        <div className="text-gray-500 text-xs text-center">
+            Ball ID: {gameResult?.user_ball}
+        </div>
+
+      </div>
+
+      <div className="p-4 border-t border-gray-800 bg-[#1a1a1a]">
+        <button
+          onClick={onClose}
+          className="w-full py-3 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition shadow-lg shadow-indigo-900/50"
+        >
+          Close
+        </button>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-black/80 backdrop-blur-md z-50 transition-opacity duration-300">
+      <div className="bg-[#1a1a1a] w-[90%] sm:w-[420px] rounded-2xl shadow-2xl overflow-hidden border border-gray-800 transition-all duration-300">
+        
+        {step === 'select' && renderSelectionStep()}
+        {step === 'video' && renderVideoStep()}
+        {step === 'result' && renderResultStep()}
+
       </div>
     </div>
   );
 };
 
 export default JoinRaceModal;
-
-
-
-
-
-
-

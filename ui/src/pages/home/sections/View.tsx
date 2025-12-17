@@ -6,24 +6,14 @@ import PinballRaceFooter from "../../../components/PinballRaceFooter";
 import Leaderboard from "../../../components/Leaderboard";
 import Data from "../../../components/data";
 import AccountScreen from "../../../components/account";
+import JoinRaceModal from "../../../components/JoinRaceModaloffline";
 
 type ActiveTab = "Home" | "Winners" | "Data" | "Profile";
 
-interface UserData {
-  _id: string;
-  username?: string;
-  email?: string;
-  clientToken?: string;
-  connectedAccounts?: {
-    google: boolean;
-    tiktok: boolean;
-    twitch: boolean;
-  };
-}
 
 const PinballRaceHome: React.FC = () => {
   // ✅ Load saved tab from localStorage, or default to "Home"
-  const [user_data, setUserData] = useState<UserData | null>(null);
+  const [isRaceModalOpen, setIsRaceModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
     const savedTab = localStorage.getItem("activeTab") as ActiveTab | null;
     return savedTab || "Home";
@@ -81,44 +71,16 @@ const PinballRaceHome: React.FC = () => {
             <LiveStreamCard />
             <RaceDashboard />
             <button
-              onClick={async () => {
-                try {
-                    // Fetch user info
-                    const userRes = await fetch(`${import.meta.env.VITE_SERVER_URL}/api/user/me`, {
-                        credentials: "include",
-                    });
-                    const userJson = await userRes.json();
-                    if (userJson.user) setUserData(userJson.user);
-                    const response = await fetch(`${import.meta.env.VITE_PY_SERVER_URL}/api/games/offline/url`, {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json",
-                      },
-                      body: JSON.stringify({ userId: user_data?._id }),
-                      credentials: "include",
-                    });
-
-                  if (!response.ok) {
-                    console.warn("⚠️ Failed to fetch offline game URL:", response.status);
-                    return;
-                  }
-
-                  const data = await response.json();
-                  const offlineGameUrl = data.url;
-
-                  if (offlineGameUrl) {
-                    window.open(offlineGameUrl, "_blank");
-                  } else {
-                    console.warn("⚠️ Offline game URL not found in response");
-                  }
-                } catch (err) {
-                  console.error("❌ Error fetching offline game URL:", err);
-                }
-              }}
-              className="mt-4 px-4 py-2 bg-blue-600 rounded hover:bg-blue-700"
-            >
-              Play Offline Game
-            </button>
+            className="w-full bg-[#121212] text-white font-semibold py-2 rounded-3xl border border-[#522cab] hover:border-blue-600 hover:bg-[#0a0a0a] transition shadow-[0_0_15px_rgba(82,44,171,0.3)]"
+            onClick={() => setIsRaceModalOpen(true)}
+        >
+            Join Offline Race
+        </button>
+        {isRaceModalOpen && (
+        <JoinRaceModal 
+          onClose={() => setIsRaceModalOpen(false)}
+          />
+        )}
           </>
         )}
         {activeTab === "Winners" && <Leaderboard />}

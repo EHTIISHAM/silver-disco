@@ -94,6 +94,9 @@ class GameModel(BaseModel):
 class DoorStatus(BaseModel):
     status: str  # "OPEN" or "CLOSED"
 
+class OfflineGameRequest(BaseModel):
+    userId: str
+    ball_id: int
 # a path to stream video based on _id input
 
 
@@ -192,13 +195,13 @@ async def process_off_game(game_id,user_id,ball_id):
     game = await db.games_off.find_one({"_id":ObjectId(game_id)})
     user = await db.users.find_one({"_id":ObjectId(user_id)})
     # fetch the rankings
-    user_points = POS_POINT[str(game["rankings"].get("ball_"+ball_id,0))]
+    user_points = POS_POINT[str(game["rankings"].get("ball_" + str(ball_id),"0"))]
 
     parti_dict = {"userId": user_id,
                   "username": user["username"],
                   "ball": str(ball_id),
                   "points": user_points,
-                  "rank": game["rankings"].get("ball_"+ball_id,999)
+                  "rank": game["rankings"].get("ball_"+str(ball_id),"999")
                   }
     await db.games_off.update_one({"_id":ObjectId(game_id)},
                                   {"$addToSet": {"participants": parti_dict}})
@@ -209,17 +212,17 @@ async def process_off_game(game_id,user_id,ball_id):
             {"_id": user["_id"]},
             {"$push": {"points": {"points":user_points,"timestamp":int(datetime.utcnow().timestamp())}}}
             )
-        new_points = user.get("total_points", 0) + user_points
+        new_points = user.get("total_points", "0") + user_points
         await db.users.update_one(
             {"_id": user["_id"]},
             {"$set": {"total_points": new_points}}
         )
-    if game["rankings"].get("ball_"+ball_id,0) in [1,2,3]:
+    if game["rankings"].get("ball_" + str(ball_id),"0") in [1,2,3]:
         await db.users.update_one(
             {"_id": user["_id"]},
             {"$push": {"numberOfWins": {"wins": 1, "timestamp": int(datetime.utcnow().timestamp())}}}
         )
-        if game["rankings"].get("ball_"+ball_id,0) == 1:
+        if game["rankings"].get("ball_" + str(ball_id),"0") == 1:
             new_streak = user.get("winningStreak", 0) + 1
             await db.users.update_one(
                 {"_id": user["_id"]},
@@ -229,23 +232,19 @@ async def process_off_game(game_id,user_id,ball_id):
         {"_id": user["_id"]},
         {"$push": {"racesPlayed": {"races": 1,"raceId": "offline", "user_ball": str(ball_id), "timestamp": int(datetime.utcnow().timestamp())}}}
     )
-    return str(game["rankings"].get("ball_"+ball_id,0)),user_points
+    return str(game["rankings"].get("ball_" + str(ball_id),"0")),user_points
 # it will receive credentials and return a random offline game url
 @app.post("/api/games/offline/url")
 async def get_offline_game_url(
-    request: Request,
-    userId: str = Form(...),
-    ball_id: int = Form(...)
+    game_data: OfflineGameRequest # <--- Accepts JSON body
 ):
-    ranks, points = await require_login(request)
-    if ranks == None:
-        ranks = "10+"
+
 
     pipeline = [
         # 1. Filter: Same conditions as before
         { "$match": { 
             "createdAt": { "$ne": None }, 
-            "participants.userId": { "$ne": userId } 
+            "participants.userId": { "$ne": game_data.userId } 
         }},
         # 2. Random Sample: Pick 1 random document from the results
         { "$sample": { "size": 1 } }
@@ -256,10 +255,12 @@ async def get_offline_game_url(
     offline_game = await cursor.to_list(length=1)
     if not offline_game:
         raise HTTPException(status_code=404, detail="No offline game available")
-    await process_off_game(offline_game["_id"],userId,ball_id)
-    secure_link = create_secure_video_link(offline_game['_id'], userId)
+    ranks, points = await process_off_game(offline_game[0]["_id"],game_data.userId,game_data.ball_id)
+    if ranks == None:
+        ranks = "10+"
+    secure_link = create_secure_video_link(offline_game['_id'], game_data.userId)
     return {"video_link": secure_link,
-            "user_ball":"ball_"+ ball_id,
+            "user_ball":"ball_"+ game_data.ball_id,
             "user_position":ranks,
             "user_points":points}
 
