@@ -176,15 +176,19 @@ const JoinRaceModal: React.FC<JoinRaceModalProps> = ({ onClose }) => {
     </>
   );
 
-  const renderVideoStep = () => (
-    <>
-      <div className="relative bg-black w-full aspect-video flex items-center justify-center">
-        {/* Close/Abort Button */}
+const renderVideoStep = () => (
+    // 1. Change root to fixed overlay (covers entire window)
+    <div className="fixed inset-0 z-50 bg-black flex flex-col animate-in fade-in duration-300">
+      
+      {/* 2. Video container takes all remaining space (flex-1) */}
+      <div className="flex-1 relative w-full flex items-center justify-center overflow-hidden">
+        
+        {/* Close Button - slightly larger and better positioned for fullscreen */}
         <button 
           onClick={onClose} 
-          className="absolute top-4 right-4 z-20 bg-black/50 p-1 rounded-full text-white hover:bg-red-600 transition"
+          className="absolute top-6 right-6 z-50 bg-black/40 hover:bg-red-600 p-2 rounded-full text-white transition backdrop-blur-sm"
         >
-          <X size={20} />
+          <X size={24} />
         </button>
 
         {gameResult?.video_link ? (
@@ -192,30 +196,31 @@ const JoinRaceModal: React.FC<JoinRaceModalProps> = ({ onClose }) => {
             ref={videoRef}
             src={gameResult.video_link}
             autoPlay
-            controls={false} // Hide default controls for a cleaner "game" feel, or set to true
+            controls={false}
             onEnded={handleVideoComplete}
-            className="w-full h-full object-contain"
-          >
-            Your browser does not support the video tag.
-          </video>
+            // 3. object-contain ensures the whole video is seen without cropping
+            // Use object-cover if you want it to zoom to fill (but might cut edges)
+            className="w-full h-full max-h-screen object-contain"
+          />
         ) : (
-            <div className="text-white">Video not available</div>
+            <div className="text-white text-xl">Video not available</div>
         )}
       </div>
 
-      {/* Video Controls Footer */}
-      <div className="flex justify-between items-center p-4 border-t border-gray-800 bg-[#1a1a1a]">
-        <div className="text-gray-400 text-sm animate-pulse">
+      {/* Footer stays at the bottom */}
+      <div className="flex justify-between items-center p-6 border-t border-gray-800 bg-[#1a1a1a] z-50">
+        <div className="text-gray-400 text-sm animate-pulse flex items-center gap-2">
+            <span className="w-2 h-2 bg-red-500 rounded-full animate-ping"/>
             Watching race...
         </div>
         <button
           onClick={handleVideoComplete}
-          className="px-4 py-2 rounded-full bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium flex items-center gap-2 transition"
+          className="px-6 py-3 rounded-full bg-gray-700 hover:bg-gray-600 text-white font-medium flex items-center gap-2 transition"
         >
-          Skip to Results <SkipForward size={16} />
+          Skip to Results <SkipForward size={20} />
         </button>
       </div>
-    </>
+    </div>
   );
 
   const renderResultStep = () => (
