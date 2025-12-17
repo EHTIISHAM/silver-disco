@@ -177,13 +177,14 @@ const JoinRaceModal: React.FC<JoinRaceModalProps> = ({ onClose }) => {
   );
 
 const renderVideoStep = () => (
-    // 1. Change root to fixed overlay (covers entire window)
-    <div className="fixed inset-0 z-50 bg-black flex flex-col animate-in fade-in duration-300">
+    // CHANGE 1: 'bottom-20' lifts the window up by roughly 80px to clear your home footer
+    // We also added 'rounded-b-3xl' for a cleaner look since it's floating now
+    <div className="fixed inset-x-0 top-0 bottom-20 z-50 bg-black flex flex-col animate-in slide-in-from-bottom-10 duration-300 rounded-b-3xl shadow-2xl overflow-hidden">
       
-      {/* 2. Video container takes all remaining space (flex-1) */}
-      <div className="flex-1 relative w-full flex items-center justify-center overflow-hidden">
+      {/* Video Container */}
+      <div className="flex-1 relative w-full flex items-center justify-center bg-black">
         
-        {/* Close Button - slightly larger and better positioned for fullscreen */}
+        {/* Close Button */}
         <button 
           onClick={onClose} 
           className="absolute top-6 right-6 z-50 bg-black/40 hover:bg-red-600 p-2 rounded-full text-white transition backdrop-blur-sm"
@@ -198,26 +199,25 @@ const renderVideoStep = () => (
             autoPlay
             controls={false}
             onEnded={handleVideoComplete}
-            // 3. object-contain ensures the whole video is seen without cropping
-            // Use object-cover if you want it to zoom to fill (but might cut edges)
-            className="w-full h-full max-h-screen object-contain"
+            // object-contain keeps the whole video visible
+            className="w-full h-full object-contain"
           />
         ) : (
             <div className="text-white text-xl">Video not available</div>
         )}
       </div>
 
-      {/* Footer stays at the bottom */}
-      <div className="flex justify-between items-center p-6 border-t border-gray-800 bg-[#1a1a1a] z-50">
+      {/* Video Controls Footer */}
+      <div className="flex justify-between items-center p-4 border-t border-gray-800 bg-[#1a1a1a]">
         <div className="text-gray-400 text-sm animate-pulse flex items-center gap-2">
             <span className="w-2 h-2 bg-red-500 rounded-full animate-ping"/>
             Watching race...
         </div>
         <button
           onClick={handleVideoComplete}
-          className="px-6 py-3 rounded-full bg-gray-700 hover:bg-gray-600 text-white font-medium flex items-center gap-2 transition"
+          className="px-5 py-2 rounded-full bg-gray-700 hover:bg-gray-600 text-white font-medium flex items-center gap-2 transition"
         >
-          Skip to Results <SkipForward size={20} />
+          Skip <SkipForward size={18} />
         </button>
       </div>
     </div>
