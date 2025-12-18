@@ -239,7 +239,25 @@ async def get_offline_game_url(
     game_data: OfflineGameRequest # <--- Accepts JSON body
 ):
 
+    now = datetime.utcnow()
+    start_of_day = int(now.replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+    user = await db.users.find_one(
+        {"_id": ObjectId(game_data.userId)},
+        {"racesPlayed": 1}
+    )
 
+    if user:
+        daily_offline_plays = 0
+        races_played = user.get("racesPlayed", [])
+        
+        # Count how many offline races were played today
+        for race in races_played:
+            if race.get("raceId") == "offline" and race.get("timestamp") >= start_of_day:
+                daily_offline_plays += 1
+        
+        if daily_offline_plays >= 3:
+            raise HTTPException(status_code=403, detail="Daily limit of 3 offline games reached")
+        
     pipeline = [
         # 1. Filter: Same conditions as before
         { "$match": { 
@@ -260,7 +278,7 @@ async def get_offline_game_url(
         ranks = "10+"
     secure_link = create_secure_video_link(str(offline_game[0]['_id']), game_data.userId)
     return {"video_link": secure_link,
-            "user_ball":"ball_"+ game_data.ball_id,
+            "user_ball":"ball_"+ str(game_data.ball_id),
             "user_position":ranks,
             "user_points":points}
 

@@ -2,12 +2,13 @@ import React, { useEffect, useState } from "react";
 import { FaUser } from "react-icons/fa";
 import tiktokConfig from "../../../api/config/tiktok.json";
 import pgicon from "../assets/pinballraceIcon.png";
+import JoinRaceModal from "../components/JoinRaceModaloffline";
 
 const LiveStreamCard: React.FC = () => {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isLive, setIsLive] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
-
+  const [isRaceModalOpen, setIsRaceModalOpen] = useState(false);
   useEffect(() => {
     const fetchStatus = async () => {
       try {
@@ -137,14 +138,30 @@ const LiveStreamCard: React.FC = () => {
                   : "Currently offline. Watch the featured TikTok clip or check back when we go live."}
               </p>
 
-              <div className="flex justify-center mb-4">
-                {/* ✅ Functional buttons */}
+<div className="flex justify-center mb-4 w-full">
+                {isLive ? (
                   <button
-    onClick={handleFollow}
-    className="bg-indigo-600 hover:bg-indigo-700 transition text-white py-2 px-6 rounded-lg text-sm font-semibold"
-  >
-    Follow
-  </button>
+                    onClick={handleFollow}
+                    className="bg-indigo-600 hover:bg-indigo-700 transition text-white py-2 px-6 rounded-lg text-sm font-semibold shadow-lg shadow-indigo-500/20"
+                  >
+                    Follow on TikTok
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      className="w-full bg-[#121212] text-white font-semibold py-2 rounded-3xl border border-[#522cab] hover:border-blue-600 hover:bg-[#0a0a0a] transition shadow-[0_0_15px_rgba(82,44,171,0.3)]"
+                      onClick={() => setIsRaceModalOpen(true)}
+                    >
+                      Join Offline Race
+                    </button>
+                    
+                    {isRaceModalOpen && (
+                      <JoinRaceModal 
+                        onClose={() => setIsRaceModalOpen(false)}
+                      />
+                    )}
+                  </>
+                )}
               </div>
 
                <div className="mt-6 text-xs text-gray-600">© {new Date().getFullYear()} Pinball Race</div>
