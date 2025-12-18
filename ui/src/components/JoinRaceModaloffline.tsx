@@ -177,14 +177,14 @@ const JoinRaceModal: React.FC<JoinRaceModalProps> = ({ onClose }) => {
   );
 
 const renderVideoStep = () => (
-    // CHANGE 1: 'bottom-20' lifts the window up by roughly 80px to clear your home footer
-    // We also added 'rounded-b-3xl' for a cleaner look since it's floating now
-    <div className="fixed inset-x-0 top-0 bottom-20 z-50 bg-black flex flex-col animate-in slide-in-from-bottom-10 duration-300 rounded-b-3xl shadow-2xl overflow-hidden">
+    <div className="fixed inset-x-0 top-0 bottom-20 z-50 bg-black flex flex-col rounded-b-3xl shadow-2xl overflow-hidden">
       
-      {/* Video Container */}
-      <div className="flex-1 relative w-full flex items-center justify-center bg-black">
+      {/* FIX: Added 'min-h-0' 
+         This stops the video from forcing the container to grow 
+         and pushing the footer away.
+      */}
+      <div className="flex-1 min-h-0 relative w-full flex items-center justify-center bg-black">
         
-        {/* Close Button */}
         <button 
           onClick={onClose} 
           className="absolute top-6 right-6 z-50 bg-black/40 hover:bg-red-600 p-2 rounded-full text-white transition backdrop-blur-sm"
@@ -199,7 +199,7 @@ const renderVideoStep = () => (
             autoPlay
             controls={false}
             onEnded={handleVideoComplete}
-            // object-contain keeps the whole video visible
+            // w-full h-full combined with object-contain ensures it stays inside
             className="w-full h-full object-contain"
           />
         ) : (
@@ -207,8 +207,8 @@ const renderVideoStep = () => (
         )}
       </div>
 
-      {/* Video Controls Footer */}
-      <div className="flex justify-between items-center p-4 border-t border-gray-800 bg-[#1a1a1a]">
+      {/* Footer - Now guaranteed to stay visible because the video above can shrink */}
+      <div className="flex-none flex justify-between items-center p-4 border-t border-gray-800 bg-[#1a1a1a] z-50 h-16">
         <div className="text-gray-400 text-sm animate-pulse flex items-center gap-2">
             <span className="w-2 h-2 bg-red-500 rounded-full animate-ping"/>
             Watching race...
