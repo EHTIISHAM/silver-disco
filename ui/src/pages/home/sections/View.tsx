@@ -7,6 +7,7 @@ import Leaderboard from "../../../components/Leaderboard";
 import Data from "../../../components/data";
 import AccountScreen from "../../../components/account";
 import JoinRaceModal from "../../../components/JoinRaceModaloffline";
+import Snowfall from 'react-snowfall'
 
 type ActiveTab = "Home" | "Winners" | "Data" | "Profile";
 
@@ -63,6 +64,9 @@ const PinballRaceHome: React.FC = () => {
 // max games per day is 3 
   return (
     <div className="bg-black min-h-screen text-white pb-24 flex flex-col">
+        <div className="fixed inset-0 pointer-events-none z-0">
+      <Snowfall />
+    </div>
       <PinballRaceHeader username={user.username} pfp={user.pfp} />
     
       <main className="flex-1 p-4 space-y-6">
