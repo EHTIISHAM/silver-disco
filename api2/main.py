@@ -971,7 +971,7 @@ async def user_stats(user_email_data: UserEmail):
             if race != 0:
                 # get points for race
                 points = points_over_time.get(ts, 0)
-                if points == 25:
+                if points == 20:
                     points_dict_per_position["1"] = points_dict_per_position.get("1", 0) + 1
                 elif points == 10:
                     points_dict_per_position["2"] = points_dict_per_position.get("2", 0) + 1
@@ -981,16 +981,25 @@ async def user_stats(user_email_data: UserEmail):
                     points_dict_per_position["4-10"] = points_dict_per_position.get("4-10", 0) + 1
                 else:
                     points_dict_per_position["11+"] = points_dict_per_position.get("11+", 0) + 1
-        # favourite balls from racesPlayed get all the user_balls and count frequency
+        # favourite balls from racesPlayed get all the user_ball and count frequency
+        # user_ball is a str like '3'or '10' etc
         favorite_balls = {}
         for r in race_entries:
             ts = safe_ts(r.get("timestamp"))
             if ts is not None:
-                balls = r.get("balls", [])
-                for b in balls:
+                b = r.get("user_ball", '')
+                if b:
                     favorite_balls[b] = favorite_balls.get(b, 0) + 1
-        # create a list of top 5 favorite balls
-        favorite_balls_list = sorted(favorite_balls.items(), key=lambda x: x[1], reverse=True)[:5]
+        # create a list of favorite balls sorted by frequency
+        favorite_balls_list = sorted(favorite_balls, key=favorite_balls.get, reverse=True)[:5]
+
+        # convert items from str to int for ball number
+        for i in range(len(favorite_balls_list)):
+            try:
+                favorite_balls_list[i] = int(favorite_balls_list[i])
+            except:
+                # remove the non convertible entry
+                faltu = favorite_balls_list.pop(i)
     return {
         "username": user.get("username"),
         "totalWins": total_wins,
