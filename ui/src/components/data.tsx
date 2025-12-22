@@ -330,6 +330,8 @@ export default function RaceHistory() {
   ];
 
   const gameTypeOptions = ["All", "Regular", "Lottery", "Elimination"];
+  const [isCustomDateActive, setIsCustomDateActive] = useState(false);
+  const [customRange, setCustomRange] = useState({ start: '', end: '' });
 // 2. EFFECT 1: Fetch User Data ONLY (Runs once on mount)
   useEffect(() => {
     const fetchUser = async () => {
@@ -468,7 +470,11 @@ export default function RaceHistory() {
             {/* TODO: Implement Custom Date Picker */}
             <div className="relative w-[48%]">
               <button
-                onClick={() => setShowDateOptions(!showDateOptions)}
+                onClick={() => {
+                setShowDateOptions(!showDateOptions);
+                // Reset custom view if closing the dropdown
+                if (showDateOptions) setIsCustomDateActive(false);
+                }}
                 className="bg-[#2b2b36] text-gray-300 text-sm px-3 py-2 rounded-full w-full text-left flex justify-between items-center"
               >
                 {selectedDate}
@@ -476,30 +482,64 @@ export default function RaceHistory() {
               </button>
               {showDateOptions && (
                 <div className="absolute top-12 left-0 w-full bg-[#1c1c22] border border-gray-700 rounded-2xl shadow-lg z-10 overflow-hidden">
-                  {dateOptions.map((option, index) => (
+                {!isCustomDateActive ? (
+                    // Standard Options List
+                    dateOptions.map((option, index) => (
                     <button
-                      key={index}
-                      onClick={() => {
+                        key={index}
+                        onClick={() => {
                         if (option === "Custom date") {
-                          const picker = document.createElement("input");
-                          picker.type = "date";
-                          picker.onchange = (e: any) =>
-                            setSelectedDate(e.target.value);
-                          picker.click();
+                            setIsCustomDateActive(true);
                         } else {
-                          setSelectedDate(option);
+                            setSelectedDate(option);
+                            setShowDateOptions(false);
                         }
-                        setShowDateOptions(false);
-                      }}
-                      className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-[#2b2b36] rounded-xl transition"
+                        }}
+                        className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-[#2b2b36] transition"
                     >
-                      {option}
+                        {option}
                     </button>
-                  ))}
+                    ))
+                ) : (
+                    // Custom Range Picker View
+                    <div className="p-3 space-y-2 bg-[#1c1c22]">
+                    <p className="text-xs text-gray-500 font-medium">Select Range</p>
+                    <input
+                        type="date"
+                        className="w-full bg-[#2b2b36] text-white text-xs p-2 rounded-lg border border-gray-600 outline-none"
+                        onChange={(e) => setCustomRange({ ...customRange, start: e.target.value })}
+                    />
+                    <input
+                        type="date"
+                        className="w-full bg-[#2b2b36] text-white text-xs p-2 rounded-lg border border-gray-600 outline-none"
+                        onChange={(e) => setCustomRange({ ...customRange, end: e.target.value })}
+                    />
+                    <div className="flex gap-2 pt-1">
+                        <button
+                        onClick={() => setIsCustomDateActive(false)}
+                        className="flex-1 text-xs text-gray-400 hover:text-white"
+                        >
+                        Back
+                        </button>
+                        <button
+                        onClick={() => {
+                            if (customRange.start && customRange.end) {
+                            setSelectedDate(`${customRange.start} - ${customRange.end}`);
+                            setShowDateOptions(false);
+                            setIsCustomDateActive(false);
+                            }
+                        }}
+                        className="flex-1 bg-[#8b6fed] text-white text-xs py-2 rounded-lg font-medium"
+                        >
+                        Apply
+                        </button>
+                    </div>
+                    </div>
+                )}
                 </div>
-              )}
+            )}
             </div>
-          </div>
+            </div>
 
           {/* Race Cards list */}
           <div className="w-full max-w-md space-y-4">

@@ -1042,10 +1042,13 @@ def get_time_range(timeline: str):
     key = timeline.strip().lower()
 
     if key not in TIMELINE_MAP:
-        raise HTTPException(400, f"Invalid timeline: {timeline}")
-
-    timeline_key = TIMELINE_MAP[key]
-
+        # check if it matches custom date format "YYYY-MM-DD - YYYY-MM-DD"
+        if " - " not in timeline:
+            raise HTTPException(400, f"Invalid timeline: {timeline}")
+    try:
+        timeline_key = TIMELINE_MAP[key]
+    except:
+        timeline_key = key
     # NOW PROCESS
     if timeline_key == "today":
         start = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -1075,9 +1078,21 @@ def get_time_range(timeline: str):
     elif timeline_key == "all":
         start = datetime.min.replace(tzinfo=timezone.utc)
         end = now
-
-    elif timeline_key == "custom":
-        raise HTTPException(400, "Custom range not implemented.")
+    # here is an example of custom range
+    # "2025-12-22 - 2025-12-31"
+    # in else we can parse the dates
+    else:
+        try:
+            # split by " - "
+            parts = timeline.split(" - ")
+            if len(parts) != 2:
+                raise ValueError("Invalid custom date format")
+            start_str = parts[0].strip()
+            end_str = parts[1].strip()
+            start = datetime.strptime(start_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            end = datetime.strptime(end_str, "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1) - timedelta(seconds=1)
+        except Exception as e:
+            raise HTTPException(400, f"Invalid custom date format: {timeline}") from e
     # convert start and end to int
     start = int(start.timestamp())
     end = int(end.timestamp())
@@ -1255,6 +1270,7 @@ async def get_race_history(req: HistoryRequest):
             processed_finishers.sort(key=lambda x: (x["ball_rank"], -x["user_points"]))
 
             # --- D. Find "You" (The User) ---
+            
             user_position_str = "No Entry"
             user_ball_num = "?"
             
@@ -1274,6 +1290,8 @@ async def get_race_history(req: HistoryRequest):
                         # Format ordinal (1st, 2nd, 11th, etc)
                         suffix = "th" if 11 <= actual_rank <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(actual_rank % 10, "th")
                         user_position_str = f"{actual_rank}{suffix}"
+                    else:
+                        user_position_str = "10+"
                     break #? why this break?
 
             # --- E. Process Top 3 Finishers ---
