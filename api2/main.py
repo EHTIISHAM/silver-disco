@@ -16,7 +16,7 @@ from typing import Optional, List, Dict, Any
 
 from urllib3 import request
 from bson import ObjectId
-from fastapi import FastAPI, Request, Form, Response, HTTPException, Query, Depends, UploadFile, File
+from fastapi import FastAPI, Request, Form, Response, HTTPException, Query, Depends, UploadFile, File, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -28,8 +28,10 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 import json
 from jose import jwt, JWTError
+import shutil
 
 from utils.utils import router as utils_router
+from utils.yolo_model import yolo_model
 
 
 load_dotenv()
@@ -102,8 +104,9 @@ class OfflineGameRequest(BaseModel):
 
 @app.post("/api/games/offline")
 async def create_offline_game(
-    game_video: UploadFile = File(...),
-    result_dict: str = Form(...),
+    background_tasks: BackgroundTasks,
+    youtube_link: str = Form(...), 
+    result_screenshot: UploadFile = File(...),
     gameType: str = Form(...),
     prize: str = Form(...)
 ):
@@ -111,31 +114,80 @@ async def create_offline_game(
     result = await db.games_off.insert_one({})
     game_id = result.inserted_id
     # save the video and frame in videos folder and the name will be _id
-    video_path = f"videos/{game_id}_video.mp4"
-
-    # convert result_dict string to dictionary 
-    # if '' is used instead of "" in json then replace them
-    result_dict = json.loads(result_dict.replace("'", "\""))
-
-    with open(video_path, "wb") as buffer:
-        # Loop until the file is fully read
-        while content := await game_video.read(CHUNK_SIZE):
-            buffer.write(content)
+    ext = result_screenshot.filename.split(".")[-1]
+    image_path = f"screenshots/{game_id}_results.{ext}"
+    
+    with open(image_path, "wb") as buffer:
+        shutil.copyfileobj(result_screenshot.file, buffer)
 
     time_now = int(datetime.utcnow().timestamp() * 1000)
 
+    # 3. Initial DB Update (Status: Processing)
     await db.games_off.update_one({"_id": game_id}, {"$set": {
         "gameType": gameType,
         "prize": prize,
-        "video_path": video_path,
-        "rankings": result_dict,
-        "participants": [],
+        "video_url": youtube_link,
+        "result_image_path": image_path,
+        "status": "processing", # Flag to show loader on frontend
         "createdAt": time_now
     }})
-    print(f"Processing Offline Game: Type={gameType}, Prize={prize}")
-    print(f"Video: {game_video.filename}")
+
+    # 4. Run Inference in Background
+    # This prevents the request from timing out while YOLO loads/processes
+    background_tasks.add_task(process_game_results, game_id, image_path)
 
     return RedirectResponse(url="/dashboard", status_code=303)
+
+async def process_game_results(game_id, image_path):
+    """
+    Runs ONNX inference, sorts balls by position, and saves results as {name: rank}.
+    """
+    try:
+        print(f"Starting processing for Game {game_id}...")
+
+        # 1. Run Inference
+        detected_objects = yolo_model.infer(image_path)
+        
+        if not detected_objects:
+            print(f"No balls detected for game {game_id}")
+            await db.games_off.update_one({"_id": game_id}, {"$set": {
+                "rankings": {}, 
+                "status": "completed_no_data"
+            }})
+            return
+
+        # 2. Sort Logic (Replicating 'rank_balls_left_to_right')
+        # We sort based on the X coordinate (Left to Right)
+        # x is index 0 in the box list [x, y, w, h]
+        
+        # If you want Left-to-Right:
+        sorted_objects = sorted(detected_objects, key=lambda obj: obj["box"][0])
+        
+        # If you want Top-to-Bottom (e.g. vertical drop):
+        # sorted_objects = sorted(detected_objects, key=lambda obj: obj["box"][1])
+
+        # 3. Generate Result Dictionary {'ball_X': rank}
+        rankings_dict = {}
+        for rank, obj in enumerate(sorted_objects):
+            ball_name = obj["name"]
+            # Rank is 1-based (1, 2, 3...), not 0-based
+            rankings_dict[ball_name] = rank + 1
+
+        print(f"Generated Rankings: {rankings_dict}")
+
+        # 4. Update Database with the Dictionary
+        await db.games_off.update_one({"_id": game_id}, {"$set": {
+            "rankings": rankings_dict,  # Saves as {'ball_3': 1, 'ball_1': 2}
+            "status": "completed"
+        }})
+        
+        print(f"Game {game_id} updated successfully.")
+
+    except Exception as e:
+        print(f"Error processing game {game_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        await db.games_off.update_one({"_id": game_id}, {"$set": {"status": "failed"}})
 
 def create_secure_video_link(video_id: str, user_id: str):
     """

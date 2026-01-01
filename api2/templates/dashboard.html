@@ -122,13 +122,13 @@
             
             <div style="flex: 1; padding-right: 20px;">
               <div class="form-group">
-                <label>Upload Game Video:</label>
-                <input type="file" name="game_video" accept="video/*" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                <label>URL Non live Game:</label>
+                <input type="text" name="youtube_link" accept="text" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
               </div>
 
               <div class="form-group" style="margin-top: 15px;">
-                <label>Result Data:</label>
-                <input type="text" name="result_dict" accept="text" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                <label>Result ScreenShot:</label>
+                <input type="file" name="result_screenshot" accept="image/*" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
               </div>
             </div>
 
@@ -142,8 +142,8 @@
                   <input type="radio" id="offlineElimination" name="gameType" value="Elimination" hidden>
                   
                   <button type="button" class="toggle-btn active" onclick="selectOfflineType('Regular', this)">Regular</button>
-                  <button type="button" class="toggle-btn" onclick="selectOfflineType('Lottery', this)">Lottery</button>
-                  <button type="button" class="toggle-btn" onclick="selectOfflineType('Elimination', this)">Elimination</button>
+                  <!--<button type="button" class="toggle-btn" onclick="selectOfflineType('Lottery', this)">Lottery</button>
+                  <button type="button" class="toggle-btn" onclick="selectOfflineType('Elimination', this)">Elimination</button> -->
                 </div>
               </div>
 
@@ -157,7 +157,7 @@
           </div>
 
           <div style="margin-top: 20px; text-align: right;">
-            <button type="submit" class="create-btn">UPLOAD & PROCESS</button>
+            <button type="submit" class="create-btn">PROCESS</button>
           </div>
 
         </form>
