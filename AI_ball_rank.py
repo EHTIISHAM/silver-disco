@@ -1,3 +1,4 @@
+#pyinstaller --noconsole --onefile --icon=favicon.ico AI_ball_rank.py
 import threading
 import tkinter as tk
 from tkinter import ttk, filedialog, scrolledtext, messagebox
@@ -48,73 +49,115 @@ def rank_balls_left_to_right(ball_detections):
 
 
 class DoorMonitorThread(threading.Thread):
-    def __init__(self, camera_index):
+    def __init__(self, config, log_callback):
         super().__init__()
-        self.camera_index = int(camera_index)
+        self.config = config
+        self.camera_index = int(config["door_camera_index"])
+        self.log = log_callback
         self.running = True
         self.paused = False
-        self.status = "UNKNOWN"
-        self.color = "#000000" # Black
         
+        # State variables
+        self.status = "UNKNOWN"
+        self.color = "#000000" 
+        self.last_sent_status = None
+
+        # OPEN CAMERA ONCE HERE
+        try:
+            self.cap = cv2.VideoCapture(self.camera_index)
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+        except Exception as e:
+            self.log(f"Door Cam Init Error: {e}")
+            self.cap = None
+
     def run(self):
         while self.running:
             if self.paused:
                 time.sleep(0.5)
                 continue
 
-            try:
-                cap = cv2.VideoCapture(self.camera_index)
-                if not cap.isOpened():
-                    self.status = "CAM ERROR"
-                    self.color = "#FFA500" # Orange
-                    time.sleep(2)
-                    continue
+            if not self.cap or not self.cap.isOpened():
+                self.status = "CAM ERROR"
+                self.color = "#FFA500"
+                time.sleep(1)
+                continue
 
-                ret, frame = cap.read()
-                cap.release() # Release immediately to allow other processes to use it if needed
-
-                if ret:
-                    # --- DETECTION LOGIC ---
-                    # 1. ROI [y1:y2, x1:x2]
+            ret, frame = self.cap.read()
+            if ret:
+                try:
+                    # 1. Process Image
                     roi = frame[210:350, 260:800] 
-
-                    # 2. Pre-process
                     gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
                     blurred_roi = cv2.GaussianBlur(gray_roi, (5, 5), 0)
                     edges = cv2.Canny(blurred_roi, 50, 150)
-                    
-                    # 3. Count
                     edge_pixel_count = cv2.countNonZero(edges)
                     
-                    # 4. Threshold Logic
-                    threshold = 500 
+                    # 2. Determine Status
+                    threshold = int(self.config.get("treshold", 500))
                     
                     if edge_pixel_count > threshold:
-                        self.status = "CLOSED"
-                        self.color = "#FF0000" # Red
+                        new_status = "CLOSED"
+                        new_color = "#FF0000"
                     else:
-                        self.status = "OPEN"
-                        self.color = "#008000" # Green
-                else:
-                    self.status = "NO FRAME"
-                    self.color = "#FFA500"
+                        new_status = "OPEN"
+                        new_color = "#008000"
 
-            except Exception as e:
-                print(f"Door Thread Error: {e}")
-                self.status = "ERROR"
+                    # 3. Update Shared Variables
+                    self.status = new_status
+                    self.color = new_color
+
+                    # 4. Handle API (Only if status CHANGED)
+                    if self.status != self.last_sent_status:
+                        self.trigger_api_update(self.status)
+                        self.last_sent_status = self.status
+
+                except Exception as e:
+                    print(f"Door Logic Error: {e}")
+                    self.status = "ERROR"
             
-            # Sleep for 1 second before next check
-            time.sleep(1)
+            # Small sleep to save CPU, but fast enough for UI
+            time.sleep(0.1)
+    def trigger_api_update(self, status_to_send):
+        """Fire and forget API call in a separate thread"""
+        def _send():
+            try:
+                # Check game status first
+                r1 = requests.post("https://admin.pinballrace.com/api/game_ongoing", timeout=3)
+                if r1.status_code == 200 and r1.json().get("status", False):
+                    # Send door status
+                    r2 = requests.post(
+                        "https://admin.pinballrace.com/api/door/status", 
+                        json={"status": status_to_send},
+                        timeout=3
+                    )
+                    self.log(f"Door API: {status_to_send} (Code: {r2.status_code})")
+            except Exception as e:
+                print(f"Door API Error: {e}")
+        
+        threading.Thread(target=_send, daemon=True).start()
 
     def stop(self):
         self.running = False
+        if self.cap:
+            self.cap.release()
         
     def set_pause(self, val):
         self.paused = val
+        # If pausing (for preview), release cap. If unpausing, reopen.
+        if val and self.cap:
+            self.cap.release()
+        elif not val:
+            self.cap = cv2.VideoCapture(self.camera_index)
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
     
     def update_camera_index(self, new_index):
         self.camera_index = int(new_index)
-
+        # Re-init camera next loop
+        self.stop()
+        self.running = True
+        self.set_pause(False)
 # ---------------- MAIN DETECTION LOGIC ----------------
 class DetectorThread(threading.Thread):
     def __init__(self, config, log_callback, stop_event):
@@ -123,7 +166,7 @@ class DetectorThread(threading.Thread):
         self.log = log_callback
         self.stop_event = stop_event
 
-    def sort_my_balls(detections):
+    def sort_my_balls(self,detections):
         """
         Sort ball detections from left to right using x1 (left boundary of the box).
         Returns a list of ball names in order.
@@ -207,10 +250,6 @@ class DetectorThread(threading.Thread):
 
             if ball_detections:
                 print(ball_detections)
-                first_ball = ball_detections[0]
-                x_center = (first_ball["box"]["x2"] + first_ball["box"]["x1"]) / 2
-                frame_center = frame.shape[1] / 2
-                position = "Left Side" if x_center < frame_center else "Right Side"
             else:
                 self.log("No balls detected")
 
@@ -240,16 +279,16 @@ class DetectorThread(threading.Thread):
             if len(ball_rankings) >= 10 or time_tag == True:
                 self.log(f"🏁 Ball Rankings ready: {ball_rankings}")
                 print(ball_rankings)
-                ball_rankings = self.sort_my_balls(ball_detections)
+                ball_rankings = self.sort_my_balls(detections=ball_detections)
                 cv2.imwrite("detected frame.jpg", annotated_frame)
                 try:
-                    response = requests.post("admin.pinballrace.com/api/games/status")
+                    response = requests.get("https://admin.pinballrace.com/api/games/status")
                     if response.status_code == 200:
                         current_game = response.json().get("currentGame", "N/A")
                         if current_game != "N/A" and current_game["status"] == "Ongoing":
                             self.log(f"Current Game: {current_game['gameNumber']} - {current_game['status']}")
                             ball_rankings  = {name: rank+1 for rank, name in enumerate(ball_rankings)}
-
+                            print("game fetched", current_game, ball_rankings)
                             response2 = requests.post(self.config["api_url"], json=ball_rankings)
                             self.log(f"Sent to API Game {current_game['gameNumber']}: {response2.status_code} ")
                     else:
@@ -269,6 +308,8 @@ class DetectorThread(threading.Thread):
     def door_status_detector(self):
         try:
             cap = cv2.VideoCapture(self.config["door_camera_index"])
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
             while True:
                 ret, frame = cap.read()
                 if not ret:
@@ -297,7 +338,7 @@ class DetectorThread(threading.Thread):
                 # Determine state based on a threshold you find by testing
                 # If text is there, count will be high (e.g., > 1000)
                 # If wall is there, count will be low (e.g., < 100)
-                threshold = 500 
+                threshold = int(self.config["treshold"])
                 
                 status = "opened"
                 color = "#008000" # Green for open
@@ -326,7 +367,7 @@ class DetectionApp:
         self.stop_event = threading.Event()
         self.detector_thread = None
 
-        self.door_thread = DoorMonitorThread(self.config["door_camera_index"])
+        self.door_thread = DoorMonitorThread(self.config, self.log)
         self.door_thread.start()
 
         self.build_ui()
@@ -367,7 +408,11 @@ class DetectionApp:
         self.door_camera_entry = ttk.Entry(self.tab_settings, width=10)
         self.door_camera_entry.insert(0, str(self.config["door_camera_index"]))
         self.door_camera_entry.pack(pady=5)
-        
+
+        ttk.Label(self.tab_settings, text="Treshold").pack(pady=5)
+        self.treshold = ttk.Entry(self.tab_settings, width=10)
+        self.treshold.insert(0, str(self.config["treshold"]))
+        self.treshold.pack(pady=5)
         # PREVIEW BUTTON
         ttk.Button(self.tab_settings, text="Preview Door Camera (5s)", command=self.preview_door_camera).pack(pady=10)
 
@@ -389,6 +434,8 @@ class DetectionApp:
         self.config["camera_index"] = self.camera_entry.get()
         self.config["api_url"] = self.api_entry.get()
         self.config["door_camera_index"] = self.door_camera_entry.get()
+        self.config["treshold"] = self.treshold.get()
+
         # Update door thread camera index
         self.door_thread.update_camera_index(self.config["door_camera_index"])
         save_config(self.config)
@@ -416,37 +463,57 @@ class DetectionApp:
         status, color_hex = self.detector_thread.door_status_detector()
         # send to api
         try:
-            response1 = requests.post("https://admin.pinballrace.com/api/game_ongoing")
-            if response1.status_code == 200:
-                if response1.json().get("status", False):
-                    response = requests.post("https://admin.pinballrace.com/api/door/status", json={"status": status})
-                    if response.status_code == 200:
-                        self.log(f"Door status '{status}' sent to API successfully.")
-                    else:
-                        self.log(f"Failed to send door status to API: {response.status_code}")
-                else:
-                    self.log("No ongoing game. Door status not sent.")
+
+            response = requests.post("https://admin.pinballrace.com/api/door/status", json={"status": status})
+            if response.status_code == 200:
+                self.log(f"Door status '{status}' sent to API successfully.")
             else:
-                self.log(f"Failed to check ongoing game status: {response1.status_code}")
+                self.log(f"Failed to send door status to API: {response.status_code}")
+
         except Exception as e:
             self.log(f"Error sending door status to API: {e}")
 
         self.door_status_label.config(text=f"Door Status: {status}", foreground=color_hex)
-        self.root.after(1000, self.update_door_status)  # Update every 2 seconds
+        # this need updating
+        self.root.after(5, self.update_door_status)  # Update every 0.005 seconds
 
     def update_door_ui(self):
-        """ Polls the door thread for status updates """
+        """ Polls the door thread for status updates (API is handled inside the thread now) """
         if self.door_thread:
-            text = f"Door Status: {self.door_thread.status}"
+            current_status = self.door_thread.status
             color = self.door_thread.color
             
-            # Update label
-            self.door_status_label.config(text=text, fg=color)
+            # Update UI Label
+            self.door_status_label.config(text=f"Door Status: {current_status}", fg=color)
         else:
-            self.log("Door thread not initialized.")
             self.door_status_label.config(text="Door Status: UNKNOWN", fg="#FFFF00")
-        # Re-run this function after 1000ms (1 second)
-        self.root.after(1000, self.update_door_ui)
+
+        # Re-run this function after 200ms (Fast UI updates)
+        self.root.after(200, self.update_door_ui)
+
+    def send_door_api(self, status):
+        """ Helper function to handle the API calls without blocking the UI """
+        try:
+            # Check if game is ongoing
+            response1 = requests.post("https://admin.pinballrace.com/api/game_ongoing")
+            
+            if response1.status_code == 200:
+                if response1.json().get("status", False):
+                    # Game is ongoing, send door status
+                    response = requests.post(
+                        "https://admin.pinballrace.com/api/door/status", 
+                        json={"status": status}
+                    )
+                    if response.status_code != 200:
+                        print(f"Failed to send door status: {response.status_code}") 
+                        # Use print here instead of self.log to avoid threading issues with Tkinter
+                else:
+                    pass # No game ongoing, do nothing
+            else:
+                print(f"Failed to check game status: {response1.status_code}")
+                
+        except Exception as e:
+            print(f"API Error: {e}")
 
     def preview_door_camera(self):
         """ Temporarily pauses monitoring to show a live feed for setup """
@@ -461,6 +528,8 @@ class DetectionApp:
         try:
             cam_idx = int(self.door_camera_entry.get())
             cap = cv2.VideoCapture(cam_idx)
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
             start_time = time.time()
             
             while True:

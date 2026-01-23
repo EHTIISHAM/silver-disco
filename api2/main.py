@@ -10,13 +10,14 @@
 import os
 import uuid
 import base64
+import re
 import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 
 from urllib3 import request
 from bson import ObjectId
-from fastapi import FastAPI, Request, Form, Response, HTTPException, Query, Depends, UploadFile, File, BackgroundTasks
+from fastapi import FastAPI, Request, Form, Response, HTTPException, Query, Depends, UploadFile, File, BackgroundTasks,status
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -44,7 +45,9 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 5
 CHUNK_SIZE = 1024 * 1024
 POS_POINT = { "1": 20, "2": 10, "3": 5, "4": 1, "5": 1 , "6": 1, "7": 1, "8": 1, "9": 1, "10": 1 ,"0":0}
-
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB in bytes
+ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
+MAX_OFFLINE_GAMES_PER_DAY = os.getenv("MAX_OFFLINE_GAMES_PER_DAY",3)
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
@@ -61,7 +64,10 @@ app.add_middleware(
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 app.include_router(utils_router)
 
+app.mount("/screenshots", StaticFiles(directory="screenshots"), name="screenshots")
+
 templates = Jinja2Templates(directory="templates")
+templates.env.policies["json.dumps_kwargs"] = {"sort_keys": False}
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Mongo client
@@ -70,6 +76,10 @@ db = mongo[DB_NAME]
 
 class UserEmail(BaseModel):
     email: str
+
+class UpdateOfflineGameRequest(BaseModel):
+    game_id: str
+    rankings: Dict[str, Any] # Accepts the dictionary structure
 
 class HistoryRequest(BaseModel):
     userId: str
@@ -110,11 +120,41 @@ async def create_offline_game(
     gameType: str = Form(...),
     prize: str = Form(...)
 ):
+    ext = result_screenshot.filename.split(".")[-1]
+
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail=f"Invalid file extension. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+        )
+
+    # --- 2. Validate MIME Type (Content-Type) ---
+    # This prevents someone from renaming 'virus.exe' to 'virus.jpg'
+    if result_screenshot.content_type not in ["image/jpeg", "image/png", "image/webp"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Invalid file type. Only images are allowed."
+        )
+
+    # --- 3. Validate File Size ---
+    # Read the file to determine size (FastAPI spools this in memory/temp file)
+    # We seek to the end (0, 2) to get the total size
+    result_screenshot.file.seek(0, 2)
+    file_size = result_screenshot.file.tell()
+
+    # IMPORTANT: Reset cursor to start so you can save the file later
+    await result_screenshot.seek(0)
+
+    if file_size > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail=f"File too large. Limit is {MAX_FILE_SIZE / 1024 / 1024}MB"
+        )
     # create an empty entry in games_off collection and get the _id back
     result = await db.games_off.insert_one({})
     game_id = result.inserted_id
     # save the video and frame in videos folder and the name will be _id
-    ext = result_screenshot.filename.split(".")[-1]
+    
     image_path = f"screenshots/{game_id}_results.{ext}"
     
     with open(image_path, "wb") as buffer:
@@ -155,10 +195,6 @@ async def process_game_results(game_id, image_path):
                 "status": "completed_no_data"
             }})
             return
-
-        # 2. Sort Logic (Replicating 'rank_balls_left_to_right')
-        # We sort based on the X coordinate (Left to Right)
-        # x is index 0 in the box list [x, y, w, h]
         
         # If you want Left-to-Right:
         sorted_objects = sorted(detected_objects, key=lambda obj: obj["box"][0])
@@ -189,57 +225,67 @@ async def process_game_results(game_id, image_path):
         traceback.print_exc()
         await db.games_off.update_one({"_id": game_id}, {"$set": {"status": "failed"}})
 
-def create_secure_video_link(video_id: str, user_id: str):
+def create_secure_video_link(youtube_url: str, user_id: str):
     """
-    Generates a token containing the video_id and user_id.
+    Generates a token containing the youtube_url and user_id.
     Returns the full URL endpoint with the token.
     """
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     
-    # We pack the data into the token
+    # We pack the YouTube URL into the token
     to_encode = {
         "sub": user_id,          # Subject (User ID)
-        "vid": video_id,         # Custom field for Video ID
+        "target_url": youtube_url, # Store the actual YouTube URL here
         "exp": expire            # Expiration time
     }
     
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     
-    # NOTE: Update 'http://localhost:8000' to your actual domain
     return f"https://admin.pinballrace.com/api/videos/secure-stream?token={encoded_jwt}"
 
 @app.get("/api/videos/secure-stream")
 async def secure_stream_video(token: str = Query(...)):
-    """
-    This endpoint does NOT take a video_id in the URL path.
-    It extracts it from the secure token.
-    """
     try:
-        # Decode and verify the token
+        # 1. Validate Token
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        video_id = payload.get("vid")
-        _ = payload.get("sub")
+        youtube_url = payload.get("target_url")
         
-        if video_id is None:
+        if not youtube_url:
             raise HTTPException(status_code=403, detail="Invalid token content")
             
     except JWTError:
-        # This catches expired tokens or fake signatures
         raise HTTPException(status_code=403, detail="Link expired or invalid")
 
-    # Locate the file
-    video_path = f"videos/{video_id}_video.mp4"
+    # 2. Extract Video ID (Handles Shorts, Standard, and Share links)
+    video_id = extract_youtube_id(youtube_url)
     
-    if not os.path.exists(video_path):
-        raise HTTPException(status_code=404, detail="Video file not found")
+    if not video_id:
+        # Fallback to direct link if parsing fails
+        return RedirectResponse(url=youtube_url)
 
-    # Generator for streaming
-    def iterfile():
-        with open(video_path, mode="rb") as file_like:
-            yield from file_like
+    # 3. Construct Embed URL
+    # autoplay=1: Starts video immediately
+    # controls=0: Hides player controls (optional, YouTube might still show some)
+    # rel=0: Prevents showing unrelated videos at the end
+    # playsinline=1: Plays inside the element on mobile (doesn't force fullscreen)
+    embed_url = f"https://www.youtube.com/embed/{video_id}?autoplay=1&controls=0&rel=0&playsinline=1"
 
-    # Return the stream
-    return StreamingResponse(iterfile(), media_type="video/mp4")
+    # 4. Redirect the browser/iframe to this secure embed URL
+    return RedirectResponse(url=embed_url)
+
+def extract_youtube_id(url: str) -> str:
+    """
+    Robust regex to extract ID from:
+    - youtube.com/shorts/ID
+    - youtube.com/watch?v=ID
+    - youtu.be/ID
+    """
+    if not url: return None
+    pattern = r"(?:v=|\/)([0-9A-Za-z_-]{11}).*"
+    match = re.search(pattern, url)
+    if match:
+        return match.group(1)
+    return None
 
 # fnction taht will take user_ID and off_game id and then automatically add the 
 async def process_off_game(game_id,user_id,ball_id):
@@ -264,7 +310,7 @@ async def process_off_game(game_id,user_id,ball_id):
             {"_id": user["_id"]},
             {"$push": {"points": {"points":user_points,"timestamp":int(datetime.utcnow().timestamp())}}}
             )
-        new_points = user.get("total_points", "0") + user_points
+        new_points = user.get("total_points", 0) + user_points
         await db.users.update_one(
             {"_id": user["_id"]},
             {"$set": {"total_points": new_points}}
@@ -307,8 +353,8 @@ async def get_offline_game_url(
             if race.get("raceId") == "offline" and race.get("timestamp") >= start_of_day:
                 daily_offline_plays += 1
         
-        if daily_offline_plays >= 3:
-            raise HTTPException(status_code=403, detail="Daily limit of 3 offline games reached")
+        if daily_offline_plays >= int(MAX_OFFLINE_GAMES_PER_DAY):
+            raise HTTPException(status_code=403, detail=f"Daily limit of {MAX_OFFLINE_GAMES_PER_DAY} offline games reached")
         
     pipeline = [
         # 1. Filter: Same conditions as before
@@ -328,7 +374,7 @@ async def get_offline_game_url(
     ranks, points = await process_off_game(offline_game[0]["_id"],game_data.userId,game_data.ball_id)
     if ranks == None:
         ranks = "10+"
-    secure_link = create_secure_video_link(str(offline_game[0]['_id']), game_data.userId)
+    secure_link = create_secure_video_link(offline_game[0]["video_url"], game_data.userId)
     return {"video_link": secure_link,
             "user_ball":"ball_"+ str(game_data.ball_id),
             "user_position":ranks,
@@ -350,6 +396,73 @@ async def delete_offline_game(
         os.remove(video_path)
     await db.games_off.delete_one({"_id": ObjectId(game_id)})
     return RedirectResponse(url="/dashboard", status_code=303)
+
+@app.post("/api/games/offline/max_per_day")
+async def update_offline_games(
+    max_games: int = Form(...),
+    # current_user: User = Depends(get_current_active_superuser) # Recommended for security
+):
+    global MAX_OFFLINE_GAMES_PER_DAY
+    
+    # 1. Update the variable in memory (Immediate effect)
+    MAX_OFFLINE_GAMES_PER_DAY = max_games
+
+    # 2. Update the .env file (Persistent effect)
+    env_path = ".env"
+    key = "MAX_OFFLINE_GAMES_PER_DAY"
+    new_line = f"{key}={max_games}\n"
+    
+    # Read all lines
+    if os.path.exists(env_path):
+        with open(env_path, "r") as f:
+            lines = f.readlines()
+    else:
+        lines = []
+
+    # Write back with the update
+    updated = False
+    with open(env_path, "w") as f:
+        for line in lines:
+            # Check if this line is the specific variable
+            if line.strip().startswith(f"{key}="):
+                f.write(new_line)
+                updated = True
+            else:
+                f.write(line)
+        
+        # If the variable wasn't in the file, add it to the end
+        if not updated:
+            # Ensure there is a newline before appending if file wasn't empty
+            if lines and not lines[-1].endswith("\n"):
+                f.write("\n")
+            f.write(new_line)
+
+    # 3. Redirect back to dashboard
+    return RedirectResponse(url="/dashboard", status_code=303)
+
+@app.post("/api/games/offline/update")
+async def update_offline_game_rankings(payload: UpdateOfflineGameRequest):
+    try:
+        # validate ObjectId
+        if not ObjectId.is_valid(payload.game_id):
+            raise HTTPException(status_code=400, detail="Invalid Game ID")
+            
+        obj_id = ObjectId(payload.game_id)
+        
+        # Update the database
+        result = await db.games_off.update_one(
+            {"_id": obj_id},
+            {"$set": {"rankings": payload.rankings}}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Game not found")
+            
+        return {"status": "success", "message": "Rankings updated"}
+        
+    except Exception as e:
+        print(f"Error updating game: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 # ---------- Utilities ----------
 async def get_next_sequence( name: str) -> int:
     """Auto-increment counter that resets daily."""
@@ -497,9 +610,7 @@ async def scheduler():
             if created_at < seven_days_ago:
                 # get the deleted _id and delete the video and frame files too
                 await db.games_off.delete_one({"_id": og["_id"]})
-                video_path = og.get("video_path")
-                if video_path and os.path.exists(video_path):
-                    os.remove(video_path)
+
                 
         if not games:
             await asyncio.sleep(30)
@@ -560,12 +671,6 @@ async def scheduler():
                         {"$set": {"status": "Finished"}}
                     )
                     break
-                
-
-            # 7️⃣ Move current_start forward for next game
-            current_start = start_time + timedelta(minutes=game["timerTillNextGame"])
-
-        # 8️⃣ After finishing all games, sleep a bit before rechecking
         print("✅ All pending games processed. Waiting for new games...")
         await asyncio.sleep(30)
 
@@ -715,6 +820,9 @@ async def dashboard(request: Request):
             og["createdAt_formatted"] = format_timestamp(og["createdAt"])
         else:
             off_games.remove(og)
+        if "rankings" in og and isinstance(og["rankings"], dict):
+            # sorted() takes the dict items, sorts them by value (x[1]), and dict() puts them back together
+            og["rankings"] = dict(sorted(og["rankings"].items(), key=lambda item: item[1]))
     context = {
         "request": request,
         "username": username,
@@ -722,6 +830,7 @@ async def dashboard(request: Request):
         "offGames": off_games,
         "nextGame": next_game,
         "currentGame": current_game,
+        "max_non_live_games": MAX_OFFLINE_GAMES_PER_DAY,
     }
     return templates.TemplateResponse("dashboard.html", context)
 
@@ -1439,7 +1548,7 @@ async def game_ongoing():
 async def door_status(status: DoorStatus):
     # this will receive the door status from the detection script
     # once the gate is opened the game with ongoing status should be updated and a startedAt timestamp should be added
-    if status.status == "opened":
+    if status.status == "OPEN":
         current_game = await db.games.find_one({"status": "Ongoing"})
         if current_game and not current_game.get("startedAt"):
             await db.games.update_one(

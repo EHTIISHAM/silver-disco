@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { X, Play, SkipForward, Trophy, MapPin } from "lucide-react";
 
 // Import images (keeping your existing imports)
@@ -54,7 +54,6 @@ const JoinRaceModal: React.FC<JoinRaceModalProps> = ({ onClose }) => {
   const [gameResult, setGameResult] = useState<OfflineGameResult | null>(null);
 
   // Refs
-  const videoRef = useRef<HTMLVideoElement>(null);
 
   // Env vars
   const serverUrl = import.meta.env.VITE_PY_SERVER_URL;
@@ -193,14 +192,14 @@ const renderVideoStep = () => (
         </button>
 
         {gameResult?.video_link ? (
-          <video
-            ref={videoRef}
-            src={gameResult.video_link}
-            autoPlay
-            controls={false}
-            onEnded={handleVideoComplete}
-            // w-full h-full combined with object-contain ensures it stays inside
-            className="w-full h-full object-contain"
+          /* CHANGED: Replaced <video> with <iframe> */
+          <iframe
+            src={gameResult.video_link} /* This is your secure backend URL */
+            title="Race Video"
+            className="w-full h-full" 
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
           />
         ) : (
             <div className="text-white text-xl">Video not available</div>
@@ -217,7 +216,7 @@ const renderVideoStep = () => (
           onClick={handleVideoComplete}
           className="px-5 py-2 rounded-full bg-gray-700 hover:bg-gray-600 text-white font-medium flex items-center gap-2 transition"
         >
-          Skip <SkipForward size={18} />
+          Continue <SkipForward size={18} />
         </button>
       </div>
     </div>
@@ -267,9 +266,6 @@ const renderVideoStep = () => (
             </div>
         </div>
         
-        <div className="text-gray-500 text-xs text-center">
-            Ball ID: {gameResult?.user_ball}
-        </div>
 
       </div>
 
