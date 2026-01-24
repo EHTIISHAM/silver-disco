@@ -111,10 +111,10 @@
     </div>
 
     <div style="display: flex; justify-content: space-between; align-items: center;" class="flex-heading">
-        <h3>Offline Games</h3>
+        <h3>Non Live Games</h3>
       </div>
     <div class="card admin-card" style="margin-top: 20px; margin-bottom: 20px;">
-
+       
       <div id="offlineFormContainer" style=" margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px;">
         <form method="post" action="/api/games/offline" enctype="multipart/form-data">
           
@@ -162,39 +162,106 @@
 
         </form>
       </div>
+    <div id="offlineFormContainer" style=" margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px;">
+        <form method="post" action="/api/games/offline/max_per_day">
+          
+          <div class="cards-row">
+            
+            <div style="flex: 1; padding-right: 20px;">
+              <div class="form-group">
+                <label>Max Non live Games per day:</label>
+                
+                <input 
+                  type="number" 
+                  name="max_games" 
+                  value="{{ max_non_live_games }}" 
+                  required 
+                  style="width: 100px; padding: 10px; border: 1px solid #ddd; border-radius: 6px;"
+                >
+                
+                <button type="submit" class="create-btn">Update</button>
+  
+            </div>
+          <div style="margin-top: 20px; text-align: right;">
+          </div>
+
+        </form>
+      </div>
     </div>
-    <section>
-        <div class="flex-heading">
-           <h3>Available Offline Games</h3>
-        </div>
-      <div class="cards-row">
+
+<section>
+    <div class="flex-heading">
+        <h3>Available Non Live Games</h3>
+    </div>
+    <div class="cards-row">
         <div class="card admin-card prizes-table-card">
-          <table>
-            <thead><tr><th>#</th><th>Game ID</th><th>Date</th><th>Delete</th></tr></thead>
-            <tbody>
-              {% if offGames %}
-                {% for p in offGames %}
-                  <tr>
-                    <td>{{ loop.index }}</td>
-                    <td>{{ p._id }}</td>
-                    <td>{{ p.createdAt_formatted }}</td>
-                    <td>
-                      <form method="post" action="/api/games/offline/delete" style="display:inline;">
-                        <input type="hidden" name="game_id" value="{{ p._id }}" />
-                        <button type="submit" class="delete-btn">Delete</button>
-                      </form>
-                    </td>
-                  </tr>
-                {% endfor %}
-              {% else %}
-                <tr>
-                  <td colspan="4" style="text-align: center; color: #6b7280;">No Offline Games available</td>
-                </tr>
-              {% endif %}
-            </tbody>
-          </table>
+            <table id="offline-games-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Game ID</th>
+                        <th>Date</th>
+                        <th>Rankings (JSON)</th> <th>Result Image</th>    <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if offGames %}
+                        {% for p in offGames %}
+                        <tr data-game-id="{{ p._id }}">
+                            <td>{{ loop.index }}</td>
+                            <td>{{ p._id }}</td>
+                            <td>{{ p.createdAt_formatted }}</td>
+                            
+                            <td>
+                            <textarea class="rankings-editor" rows="5" cols="30" style="font-family: monospace; font-size: 12px;">
+                                {{ p.rankings | tojson(indent=2) }}
+                            </textarea>
+                            </td>
+
+                            <td style="text-align: center;">
+                                {% if p.result_image_path %}
+                                    <button type="button" class="preview-btn" onclick="openPreview('{{ p.result_image_path }}')">
+                                        Preview
+                                    </button>
+                                {% else %}
+                                    <span style="color: grey;">No Image</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                <button type="button" class="save-btn" onclick="saveRankings('{{ p._id }}', this)">Save</button>
+                                
+                                <form method="post" action="/api/games/offline/delete" style="display:inline; margin-left: 5px;">
+                                    <input type="hidden" name="game_id" value="{{ p._id }}" />
+                                    <button type="submit" class="delete-btn" onclick="return confirm('Are you sure?')">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" style="text-align: center; color: #6b7280;">No Offline Games available</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
         </div>
-    </section>
+    </div>
+</section>
+
+<div id="imageModal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center;">
+    <div style="position: relative; max-width: 90%; max-height: 90%;">
+        <button onclick="closePreview()" style="position: absolute; top: -10px; right: -10px; background: red; color: white; border: none; border-radius: 50%; width: 30px; height: 30px; cursor: pointer;">X</button>
+        <img id="modalImage" src="" alt="Game Result" style="max-width: 100%; max-height: 80vh; border: 2px solid white; border-radius: 8px;">
+    </div>
+</div>
+
+<style>
+    .rankings-editor { width: 100%; border: 1px solid #ddd; border-radius: 4px; padding: 5px; }
+    .preview-btn { background-color: #3b82f6; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+    .save-btn { background-color: #10b981; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+    .delete-btn { background-color: #ef4444; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+</style>
     <!-- Prizes Section -->
     <section>
       <h3>Prizes</h3>
@@ -312,6 +379,75 @@
   // Run every 5 seconds
   setInterval(refreshGameStatus, 5000);
   document.addEventListener("DOMContentLoaded", refreshGameStatus);
+// --- Image Preview Functions ---
+function openPreview(imagePath) {
+    // 1. Construct the path (keep your logic for prefixes if needed)
+    // If you need the static prefix from your previous comments:
+    // const fullPath = "/static/" + imagePath;
+    
+    // OR if the path is already correct:
+    const fullPath = imagePath;
+
+    // 2. Open the URL in a new tab
+    // '_blank' instructs the browser to create a new tab/window
+    window.open(fullPath, '_blank');
+}
+function closePreview() {
+    document.getElementById('imageModal').style.display = 'none';
+}
+
+// Close modal if clicking outside the image
+document.getElementById('imageModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closePreview();
+    }
+});
+
+// --- Save Rankings Function ---
+async function saveRankings(gameId, btnElement) {
+    // Find the textarea associated with the clicked button
+    const row = btnElement.closest('tr');
+    const textarea = row.querySelector('.rankings-editor');
+    const jsonString = textarea.value;
+
+    try {
+        // 1. Validate JSON on client side first
+        const parsedRankings = JSON.parse(jsonString);
+
+        // 2. Visual feedback
+        const originalText = btnElement.innerText;
+        btnElement.innerText = "Saving...";
+        btnElement.disabled = true;
+
+        // 3. Send to Backend
+        const response = await fetch('/api/games/offline/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                game_id: gameId,
+                rankings: parsedRankings
+            })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            alert("Rankings updated successfully!");
+        } else {
+            alert("Error updating: " + (result.detail || "Unknown error"));
+        }
+
+        // Restore button
+        btnElement.innerText = originalText;
+        btnElement.disabled = false;
+
+    } catch (e) {
+        alert("Invalid JSON format! Please check your syntax.");
+        console.error(e);
+    }
+}
 </script>
 </body>
 </html>

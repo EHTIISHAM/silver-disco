@@ -7,10 +7,14 @@ import Leaderboard from "../../../components/Leaderboard";
 import Data from "../../../components/data";
 import AccountScreen from "../../../components/account";
 import JoinRaceModal from "../../../components/JoinRaceModaloffline";
-import Snowfall from 'react-snowfall'
 
 type ActiveTab = "Home" | "Winners" | "Data" | "Profile";
 
+interface UserState {
+  username?: string;
+  pfp?: string;
+  _id?: string;
+}
 
 const PinballRaceHome: React.FC = () => {
   // ✅ Load saved tab from localStorage, or default to "Home"
@@ -21,7 +25,7 @@ const PinballRaceHome: React.FC = () => {
   });
 
   // ✅ User state for header props
-  const [user, setUser] = useState<{ username?: string; pfp?: string }>({});
+  const [user, setUser] = useState<UserState>({});
 
   const handleTabChange = (tab: ActiveTab) => {
     setActiveTab(tab);
@@ -47,9 +51,12 @@ const PinballRaceHome: React.FC = () => {
         const data = await res.json();
         const userData = data.user || data;
 
+
+
         setUser({
           username: userData.username,
           pfp: userData.pfp,
+          _id: userData._id, 
         });
       } catch (err) {
         console.error("❌ Error fetching user:", err);
@@ -65,7 +72,6 @@ const PinballRaceHome: React.FC = () => {
   return (
     <div className="bg-black min-h-screen text-white pb-24 flex flex-col">
         <div className="fixed inset-0 pointer-events-none z-0">
-      <Snowfall />
     </div>
       <PinballRaceHeader username={user.username} pfp={user.pfp} />
     
@@ -73,7 +79,7 @@ const PinballRaceHome: React.FC = () => {
         {activeTab === "Home" && (
           <>
             <LiveStreamCard />
-            <RaceDashboard />
+            <RaceDashboard username={user.username || ""} />
             <button
             className="w-full bg-[#121212] text-white font-semibold py-2 rounded-3xl border border-[#522cab] hover:border-blue-600 hover:bg-[#0a0a0a] transition shadow-[0_0_15px_rgba(82,44,171,0.3)]"
             onClick={() => setIsRaceModalOpen(true)}

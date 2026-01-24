@@ -1513,14 +1513,10 @@ def fix_mongo_doc(doc: Dict[str, Any]) -> Dict[str, Any]:
     return doc
 
 @app.get("/api/leaderboard/recent")
-async def get_recent_races():
+async def get_recent_races(username: Optional[str] = Query(None)):
     try:
-        # 1. Find all documents
-        # 2. Sort by 'datePlayed' in Descending order (-1) means newest first
-        # 3. Limit to 4 results
-        cursor = db.leaderboard.find({}).sort("datePlayed", -1).limit(4)
-        
-        # Convert cursor to a list
+        query_filter = {"username": username} if username else {}
+        cursor = db.leaderboard.find(query_filter).sort("datePlayed", -1).limit(4)
         recent_races = await cursor.to_list(length=4)
         
         # Clean up the ObjectIds and return

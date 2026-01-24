@@ -42,6 +42,10 @@ const ballImages: { [key: string]: string } = {
   "15": b15,
 };
 
+interface RaceDashboardProps {
+  username: string; // Optional because data might still be loading
+}
+
 function getNextRaceStartTime(createdAt: number, timerTillNextRace?: number): string {
   const minutes = timerTillNextRace || 0;
   const startDate = new Date(createdAt + minutes * 60 * 1000);
@@ -93,9 +97,10 @@ const ProgressBar: React.FC<{ time: number; maxTime: number }> = ({ time, maxTim
   );
 };
 
-const RaceDashboard: React.FC = () => {
+const RaceDashboard: React.FC<RaceDashboardProps> = ({ username }) => {
   const [showModal, setShowModal] = useState(false);
   const [recentRaces, setRecentRaces] = useState<any[]>([]);
+  const [filterMode, setFilterMode] = useState<'all' | 'me'>('all');
   const [games, setGames] = useState<Game[]>([]);
   const [remaining, setRemaining] = useState<number>(0);
   const currentGameType = games[0]?.gameType || "----";
@@ -110,15 +115,20 @@ const RaceDashboard: React.FC = () => {
   const currentEntry = games[0]?.entry || "free";
   const currentgift = games[0]?.prizeTitle || "Points Only";
   
-
-
-
+  // TODO: make it so that we can filter out user own data too
   // ✅ Fetch data from backend LeaderboardTemp
   useEffect(() => {
   const fetchRecentRaces = async () => {
     try {
       console.log("🔄 Fetching leaderboard data...");
-      const res = await fetch(`${import.meta.env.VITE_PY_SERVER_URL}/api/leaderboard/recent`);
+      
+      const pyServerUrl = import.meta.env.VITE_PY_SERVER_URL;
+      const url = new URL(`${pyServerUrl}/api/leaderboard/recent`);
+      if (filterMode === 'me' && username) {
+          url.searchParams.append("username", username);
+        }
+
+      const res = await fetch(url.toString());
 
 
       // Check if request failed
@@ -142,7 +152,7 @@ const RaceDashboard: React.FC = () => {
   };
 
   fetchRecentRaces();
-}, []);
+}, [filterMode, username]);
 
 useEffect(() => { fetchGames(); }, []);
   const fetchGames = async () => {
@@ -332,13 +342,39 @@ useEffect(() => {
 
 
 
-        {/* ----- Recent Races (Fetched from Backend) ----- */}
-        {/* <div className="bg-[#111] rounded-white 2xl p-4 shadow border border-gray-800"> */}
-        <div className="bg-[#121212] rounded-2xl p-4 shadow border border-gray-800 flex flex-col gap-2">
+    {/* Header Row: Title + Toggle on the same line */}
+    <div className="bg-[#121212] rounded-2xl p-4 shadow border border-gray-800 flex flex-col gap-2">
 
-          
-          <h2 className="text-sm text--400 mb-3">Recent races</h2>
-
+          {/* Header Row: Title + Toggle on the same line */}
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm text-gray-400">Recent races</h2>
+            
+            <div className="bg-[#0a0a0a] border border-[#333] rounded-full p-1 flex items-center relative h-8 w-24">
+                {/* Sliding Background */}
+                <div 
+                    className={`absolute top-1 bottom-1 w-[44px] bg-[#522cab] rounded-full transition-all duration-300 ease-in-out ${
+                        filterMode === 'all' ? 'left-1' : 'left-[49px]'
+                    }`}
+                />
+            
+            <button
+                onClick={() => setFilterMode('all')}
+                className={`flex-1 text-xs font-bold z-10 transition-colors duration-200 ${
+                    filterMode === 'all' ? 'text-white' : 'text-gray-500 hover:text-gray-300'
+                }`}
+            >
+                All
+            </button>
+            <button
+                onClick={() => setFilterMode('me')}
+                className={`flex-1 text-xs font-bold z-10 transition-colors duration-200 ${
+                    filterMode === 'me' ? 'text-white' : 'text-gray-500 hover:text-gray-300'
+                }`}
+            >
+                Me
+            </button>
+        </div>
+        </div>
           {recentRaces.length === 0 ? (
             <p className="text-gray-500 text-sm">No recent races found</p>
           ) : (
