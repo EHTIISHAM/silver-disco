@@ -152,7 +152,7 @@ const LiveStreamCard: React.FC = () => {
                       className="w-full bg-[#121212] text-white font-semibold py-2 rounded-3xl border border-[#522cab] hover:border-blue-600 hover:bg-[#0a0a0a] transition shadow-[0_0_15px_rgba(82,44,171,0.3)]"
                       onClick={() => setIsRaceModalOpen(true)}
                     >
-                      Join Non Live Games
+                      Play Non Live Games
                     </button>
                     
                     {isRaceModalOpen && (
