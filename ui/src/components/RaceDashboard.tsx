@@ -114,6 +114,7 @@ const RaceDashboard: React.FC<RaceDashboardProps> = ({ username }) => {
   const gamestarttime = starttimeofgame.split(":").slice(0,2).join(":") || "xx:xx";
   const currentEntry = games[0]?.entry || "free";
   const currentgift = games[0]?.prizeTitle || "Points Only";
+  const isGameUnavailable = currentGameNumber === "----";
   
   // TODO: make it so that we can filter out user own data too
   // ✅ Fetch data from backend LeaderboardTemp
@@ -332,12 +333,17 @@ useEffect(() => {
   </div>
 
   {/* 🔘 Join Button */}
-  <button
-    className="w-full bg-[#121212] text-white font-semibold py-2 rounded-3xl border border-[#522cab] hover:border-blue-600 hover:bg-[#0a0a0a] transition"
+    <button
+    className={`w-full font-semibold py-2 rounded-3xl border transition ${
+        isGameUnavailable 
+        ? "bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed" 
+        : "bg-[#121212] text-white border-[#522cab] hover:border-blue-600 hover:bg-[#0a0a0a]"
+    }`}
     onClick={() => setShowModal(true)}
-  >
-    Join next Race
-  </button>
+    disabled={isGameUnavailable}
+    >
+    {isGameUnavailable ? "No Race Available" : "Join next Race"}
+    </button>
 </div>
 
 
@@ -378,9 +384,9 @@ useEffect(() => {
           {recentRaces.length === 0 ? (
             <p className="text-gray-500 text-sm">No recent races found</p>
           ) : (
-            recentRaces.map((race, i) => (
-              <div
-                key={i}
+            recentRaces.map((race) => (
+            <div
+                key={`${race.raceId}-${race.createdAt}`}
                 className="flex items-center justify-between bg-[#1a1a1a] p-3 rounded-xl mb-2 hover:bg-gray-800 transition"
               >
                 <div className="flex items-center space-x-3">
@@ -389,7 +395,8 @@ useEffect(() => {
                       {"#"}{race.raceId}
                     </p>
                    <p className="text-sm text-gray-400">
-                      <span className="text-[#8b6fed] text-xs font-bold">Winner</span> •{" "}
+
+                      <span className="text-[#8b6fed] text-xs font-bold">{race.isOffline ? race.position : "Winner"}</span> •{" "}
                       <span className="text-[#767676]">{race.username || "No Winner"}</span>
                     </p>
 

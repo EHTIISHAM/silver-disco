@@ -329,7 +329,7 @@ export default function RaceHistory() {
     "Custom date",
   ];
 
-  const gameTypeOptions = ["All", "Regular", "Lottery", "Elimination"];
+  const gameTypeOptions = ["All", "Regular", "Lottery", "Elimination","Offline"];
   const [isCustomDateActive, setIsCustomDateActive] = useState(false);
   const [customRange, setCustomRange] = useState({ start: '', end: '' });
 // 2. EFFECT 1: Fetch User Data ONLY (Runs once on mount)

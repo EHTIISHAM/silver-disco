@@ -122,7 +122,7 @@ async def create_offline_game(
 ):
     ext = result_screenshot.filename.split(".")[-1]
 
-    if ext not in ALLOWED_EXTENSIONS:
+    if ext.lower() not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, 
             detail=f"Invalid file extension. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
@@ -290,6 +290,7 @@ def extract_youtube_id(url: str) -> str:
 # fnction taht will take user_ID and off_game id and then automatically add the 
 async def process_off_game(game_id,user_id,ball_id):
     # first find the game
+    now = datetime.utcnow()
     game = await db.games_off.find_one({"_id":ObjectId(game_id)})
     user = await db.users.find_one({"_id":ObjectId(user_id)})
     # fetch the rankings
@@ -297,6 +298,7 @@ async def process_off_game(game_id,user_id,ball_id):
 
     parti_dict = {"userId": user_id,
                   "username": user["username"],
+                  "createdAt": int(now.timestamp()),
                   "ball": str(ball_id),
                   "points": user_points,
                   "rank": game["rankings"].get("ball_"+str(ball_id),"999")
@@ -544,6 +546,18 @@ async def leaderboard_entry(current_game, rankings):
         "wins": wins,
     })
     return True
+
+def adjust_rank(rank: str|int) -> str:
+    """Converts '1' to '1st', '2' to '2nd', etc."""
+    try:
+        rank_num = int(rank)
+        if 10 <= rank_num % 100 <= 20:
+            suffix = "th"
+        else:
+            suffix = {1: "st", 2: "nd", 3: "rd"}.get(rank_num % 10, "th")
+        return f"{rank_num}{suffix}"
+    except ValueError:
+        return str(rank)  # Return as-is if it's not a number
 
 async def pastwinner_entry(current_game, rankings):
     """
@@ -1367,7 +1381,7 @@ async def get_race_history(req: HistoryRequest):
     query = {
         "status": "Finished" # Only show finished games
     }
-    
+    off_query = {}
     # Apply optional Game Type filter
     if req.gameType != "All":
         query["gameType"] = req.gameType
@@ -1375,11 +1389,13 @@ async def get_race_history(req: HistoryRequest):
         try:
             start_t, end_t = get_time_range(req.date)
             query["createdAt"] = {"$gte": start_t * 1000, "$lte": end_t * 1000}
+            off_query["participants.createdAt"] = {"$exists": True,"$gte": start_t , "$lte": end_t }
         except HTTPException as e:
             raise HTTPException(400, f"Invalid date filter: {req.date}") from e
 
     # 2. Execute Query (Sort by newest first)
     cursor = db.games.find(query).sort("createdAt", -1).limit(req.limit)
+    # gametype not all or offline then dont send the game_off data
 
     races_data = []
 
@@ -1498,29 +1514,134 @@ async def get_race_history(req: HistoryRequest):
         except Exception as e:
             print(f"Error processing game {game.get('_id')}: {e}")
             continue
+    if req.gameType != "All" and req.gameType != "Offline":
+        off_cursor_game = []
+    else:
+        off_cursor_game = db.games_off.find(off_query).sort("participants.createdAt", -1).limit(req.limit)
+        async for games in off_cursor_game:
+            # add a minute to createAt to make it look like a real game and add duration of 1 minute to end timestamp
+            end_ts = games["createdAt"] + 60*1000
+            duration_str = "1:00"
+            # get top 3 participants based on ball number sorted by ball number ascending and createdAt ascending
+            participants = games.get("participants", [])
+            # first get the user data from participants matching req.userId and get the ball number and createdAt for that user
+            user_data = next((p for p in participants if str(p.get("userId")) == str(req.userId)), None)
+            rankings = games.get("rankings", {})
+            # sort participants based on createdAt ascending
+            participants.sort(key=lambda x: x.get("createdAt", 0))
+            for rank in rankings.items():
+                ball_key, position = rank
+                ball_num = ball_key.replace("ball_", "")
+                participant = get_participant_by_ball(participants, ball_num)
+                if participant:
+                    participant["ball_rank"] = position
+            # sort participants based on ball_rank ascending and createdAt ascending
+            participants.sort(key=lambda x: (x.get("ball_rank", 999), x.get("createdAt", 0)))
+            # find the position of the user in the sorted participants
+            user_position_str = "No Entry"
+            user_ball_num = "?"
+            for i, p in enumerate(participants):
+                if str(p.get("userId")) == str(req.userId):
+                    user_ball_num = p.get("ball", "?")
+                    if "ball_rank" in p:
+                        rank = p["ball_rank"]
+                        if rank < 999:
+                            suffix = "th" if 11 <= rank <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(rank % 10, "th")
+                            user_position_str = f"{rank}{suffix}"
+                        else:
+                            user_position_str = "10+"
+                    break
+                # get top 3 finishers based on ball_rank
+            top_finishers = []
+            for p in participants[:3]:
+                if "ball_rank" in p and p["ball_rank"] < 999:
+                    rank = p["ball_rank"]
+                    w_name = p.get("username", "Unknown")
+                    if str(p.get("userId")) == str(req.userId):
+                        w_name = "You"
+                    w_suffix = {1: "st", 2: "nd", 3: "rd"}.get(rank, "th")
+                    top_finishers.append({
+                        "name": w_name,
+                        "position": f"{rank}{w_suffix}",
+                        "time": duration_str,
+                        "ball": f"Ball {p.get('ball', '?')}",
+                        "iconType": "crown" if rank == 1 else "medal1" if rank == 2 else "medal2"
+                    })
+            
+            races_data.append({
+                "id":"Offline",
+                "mode":"Regular-Offline",
+                "startTimestamp":games["createdAt"],
+                "endTimestamp":end_ts,
+                "duration": duration_str,
+                "position": user_position_str,
+                "yourBall": f"Ball {user_ball_num}",
+                "topFinishers": top_finishers
+            })
 
+    # sort races_data by startTimestamp in descending order
+    races_data.sort(key=lambda x: x["startTimestamp"], reverse=True)
     return races_data
-
-def fix_mongo_doc(doc: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Helper to convert MongoDB ObjectIds to strings 
-    so FastAPI can return valid JSON.
-    """
-    if doc.get("_id"):
-        doc["_id"] = str(doc["_id"])
-    if doc.get("gameId"):
-        doc["gameId"] = str(doc["gameId"])
-    return doc
 
 @app.get("/api/leaderboard/recent")
 async def get_recent_races(username: Optional[str] = Query(None)):
     try:
         query_filter = {"username": username} if username else {}
-        cursor = db.leaderboard.find(query_filter).sort("datePlayed", -1).limit(4)
+        # and participants.createdAt should be available for games_off to sort by recent games
+        if username:
+            off_query_filter = {"participants.username": username,
+                            "participants.createdAt": {"$exists": True}} if username else {"participants.createdAt": {"$exists": True}}
+            off_cursor = db.games_off.find(off_query_filter).sort("participants.createdAt", -1).limit(100)
+            games_off_list = await off_cursor.to_list(length=4)  
+        else:
+            games_off_list = []
+        cursor = db.leaderboard.find(query_filter).sort("datePlayed", -1).limit(100)
         recent_races = await cursor.to_list(length=4)
-        
-        # Clean up the ObjectIds and return
-        return [fix_mongo_doc(race) for race in recent_races]
+        #TODO: apply loop to leaderboard and games_off_list
+        # get _id (for offline is offline), username,top5Balls
+        # get games_off id offline, username = participants.username, top5balls = participants.ball converted to int
+
+        res_data = []
+        for race in recent_races:
+            data = {}
+            data["raceId"] = race["raceId"]
+            data["username"] = race["username"]
+            data["top5Balls"] = race["top5Balls"]
+            data["isOffline"] = False
+            data["position"] = "0"
+            data["createdAt"]= race["datePlayed"]
+            res_data.append(data)
+        for games in games_off_list:
+            # only the number remove the "ball_"
+            winning_balls = []
+            for rank_key, _ in games.get("rankings", {}).items():
+                ball_num = rank_key.replace("ball_", "")
+                winning_balls.append(int(ball_num))
+            for parts in games["participants"]:
+                rank = adjust_rank(parts["rank"])
+                if parts["username"] == username:
+                    data = {}
+                    data["raceId"] = "Offline"
+                    data["username"] = parts["username"]
+                    data["top5Balls"] = winning_balls
+                    data["position"] = rank
+                    data["isOffline"] = True
+                    data["createdAt"]= games["createdAt"]
+                    res_data.append(data)
+
+        # sort res_data by createdAt in descending order
+        def get_sort_time(x):
+            val = x["createdAt"]
+            if isinstance(val, datetime):
+                return val.timestamp() # Converts datetime to float
+            try:
+                return float(val) # Handles existing floats, ints, or numeric strings
+            except (ValueError, TypeError):
+                return 0.0 # Fallback for corrupted/missing data
+
+        # sort res_data by normalized createdAt in descending order
+        res_data.sort(key=get_sort_time, reverse=True)
+        return res_data
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
