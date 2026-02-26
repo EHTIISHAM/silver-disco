@@ -94,7 +94,7 @@ class DoorMonitorThread(threading.Thread):
                     edge_pixel_count = cv2.countNonZero(edges)
                     
                     # 2. Determine Status
-                    threshold = int(self.config.get("treshold", 500))
+                    threshold = int(self.config.get("threshold", 500))
                     
                     if edge_pixel_count > threshold:
                         new_status = "CLOSED"
@@ -306,6 +306,7 @@ class DetectorThread(threading.Thread):
         self.log("Detection stopped.")
     
     def door_status_detector(self):
+        # FIX: NOT WORKING
         try:
             cap = cv2.VideoCapture(self.config["door_camera_index"])
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
@@ -338,7 +339,7 @@ class DetectorThread(threading.Thread):
                 # Determine state based on a threshold you find by testing
                 # If text is there, count will be high (e.g., > 1000)
                 # If wall is there, count will be low (e.g., < 100)
-                threshold = int(self.config["treshold"])
+                threshold = int(self.config["threshold"])
                 
                 status = "opened"
                 color = "#008000" # Green for open
@@ -409,10 +410,10 @@ class DetectionApp:
         self.door_camera_entry.insert(0, str(self.config["door_camera_index"]))
         self.door_camera_entry.pack(pady=5)
 
-        ttk.Label(self.tab_settings, text="Treshold").pack(pady=5)
-        self.treshold = ttk.Entry(self.tab_settings, width=10)
-        self.treshold.insert(0, str(self.config["treshold"]))
-        self.treshold.pack(pady=5)
+        ttk.Label(self.tab_settings, text="threshold").pack(pady=5)
+        self.threshold = ttk.Entry(self.tab_settings, width=10)
+        self.threshold.insert(0, str(self.config["threshold"]))
+        self.threshold.pack(pady=5)
         # PREVIEW BUTTON
         ttk.Button(self.tab_settings, text="Preview Door Camera (5s)", command=self.preview_door_camera).pack(pady=10)
 
@@ -434,7 +435,7 @@ class DetectionApp:
         self.config["camera_index"] = self.camera_entry.get()
         self.config["api_url"] = self.api_entry.get()
         self.config["door_camera_index"] = self.door_camera_entry.get()
-        self.config["treshold"] = self.treshold.get()
+        self.config["threshold"] = self.threshold.get()
 
         # Update door thread camera index
         self.door_thread.update_camera_index(self.config["door_camera_index"])

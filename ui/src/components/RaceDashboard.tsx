@@ -153,7 +153,19 @@ const RaceDashboard: React.FC<RaceDashboardProps> = ({ username }) => {
   };
 
   fetchRecentRaces();
-}, [filterMode, username]);
+// 2. Setup the polling interval ONLY when on the 'all' tab
+    let interval: ReturnType<typeof setInterval>;
+    if (filterMode === 'all') {
+      interval = setInterval(() => {
+        fetchRecentRaces();
+      }, 5000); // Refreshes every 5 seconds (adjust as needed)
+    }
+
+    // 3. Cleanup interval when unmounting or switching tabs
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [filterMode, username]);
 
 useEffect(() => { fetchGames(); }, []);
   const fetchGames = async () => {

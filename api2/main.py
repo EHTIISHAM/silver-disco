@@ -551,6 +551,8 @@ def adjust_rank(rank: str|int) -> str:
     """Converts '1' to '1st', '2' to '2nd', etc."""
     try:
         rank_num = int(rank)
+        if rank_num == 999:
+            return "N-A"
         if 10 <= rank_num % 100 <= 20:
             suffix = "th"
         else:
@@ -1516,6 +1518,8 @@ async def get_race_history(req: HistoryRequest):
             continue
     if req.gameType != "All" and req.gameType != "Offline":
         off_cursor_game = []
+    # TODO: Only send User not other user data will be sent in any of the offline section
+    # not in top 3 positions nothing only current user data THATHSAP:::
     else:
         off_cursor_game = db.games_off.find(off_query).sort("participants.createdAt", -1).limit(req.limit)
         async for games in off_cursor_game:
@@ -1626,7 +1630,7 @@ async def get_recent_races(username: Optional[str] = Query(None)):
                     data["top5Balls"] = winning_balls
                     data["position"] = rank
                     data["isOffline"] = True
-                    data["createdAt"]= games["createdAt"]
+                    data["createdAt"]= parts["createdAt"]
                     res_data.append(data)
 
         # sort res_data by createdAt in descending order
