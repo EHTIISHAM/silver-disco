@@ -1518,65 +1518,57 @@ async def get_race_history(req: HistoryRequest):
             continue
     if req.gameType != "All" and req.gameType != "Offline":
         off_cursor_game = []
-    # TODO: Only send User not other user data will be sent in any of the offline section
-    # not in top 3 positions nothing only current user data THATHSAP:::
     else:
         off_cursor_game = db.games_off.find(off_query).sort("participants.createdAt", -1).limit(req.limit)
         async for games in off_cursor_game:
             # add a minute to createAt to make it look like a real game and add duration of 1 minute to end timestamp
             end_ts = games["createdAt"] + 60*1000
             duration_str = "1:00"
-            # get top 3 participants based on ball number sorted by ball number ascending and createdAt ascending
+            
             participants = games.get("participants", [])
-            # first get the user data from participants matching req.userId and get the ball number and createdAt for that user
-            user_data = next((p for p in participants if str(p.get("userId")) == str(req.userId)), None)
             rankings = games.get("rankings", {})
-            # sort participants based on createdAt ascending
-            participants.sort(key=lambda x: x.get("createdAt", 0))
-            for rank in rankings.items():
-                ball_key, position = rank
-                ball_num = ball_key.replace("ball_", "")
-                participant = get_participant_by_ball(participants, ball_num)
-                if participant:
-                    participant["ball_rank"] = position
-            # sort participants based on ball_rank ascending and createdAt ascending
-            participants.sort(key=lambda x: (x.get("ball_rank", 999), x.get("createdAt", 0)))
-            # find the position of the user in the sorted participants
+            
             user_position_str = "No Entry"
             user_ball_num = "?"
-            for i, p in enumerate(participants):
-                if str(p.get("userId")) == str(req.userId):
-                    user_ball_num = p.get("ball", "?")
-                    if "ball_rank" in p:
-                        rank = p["ball_rank"]
-                        if rank < 999:
-                            suffix = "th" if 11 <= rank <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(rank % 10, "th")
-                            user_position_str = f"{rank}{suffix}"
-                        else:
-                            user_position_str = "10+"
-                    break
-                # get top 3 finishers based on ball_rank
             top_finishers = []
-            for p in participants[:3]:
-                if "ball_rank" in p and p["ball_rank"] < 999:
-                    rank = p["ball_rank"]
-                    w_name = p.get("username", "Unknown")
-                    if str(p.get("userId")) == str(req.userId):
-                        w_name = "You"
-                    w_suffix = {1: "st", 2: "nd", 3: "rd"}.get(rank, "th")
+            
+            # 1. Find ONLY the current user in participants
+            user_data = next((p for p in participants if str(p.get("userId")) == str(req.userId)), None)
+            
+            if user_data:
+                user_ball_num = user_data.get("ball", "?")
+                # Ensure we match the exact key format in your DB (e.g., "ball_5")
+                ball_key = f"ball_{user_ball_num}"
+                
+                # 2. Check if the user's ball is in the rankings
+                if ball_key in rankings:
+                    rank = rankings[ball_key]
+                    
+                    # Format position suffix (1st, 2nd, 3rd, 4th...)
+                    if 11 <= rank <= 13:
+                        suffix = "th"
+                    else:
+                        suffix = {1: "st", 2: "nd", 3: "rd"}.get(rank % 10, "th")
+                        
+                    user_position_str = f"{rank}{suffix}"
+                    
+                    # 3. Append ONLY the user to topFinishers since they are ranked
                     top_finishers.append({
-                        "name": w_name,
-                        "position": f"{rank}{w_suffix}",
+                        "name": "You",
+                        "position": user_position_str,
                         "time": duration_str,
-                        "ball": f"Ball {p.get('ball', '?')}",
+                        "ball": f"Ball {user_ball_num}",
                         "iconType": "crown" if rank == 1 else "medal1" if rank == 2 else "medal2"
                     })
-            
+                else:
+                    # User participated but wasn't ranked
+                    user_position_str = "10+"
+
             races_data.append({
-                "id":"Offline",
-                "mode":"Regular-Offline",
-                "startTimestamp":games["createdAt"],
-                "endTimestamp":end_ts,
+                "id": "Offline", # Good practice to pass stringified ID if possible
+                "mode": "Regular-Offline",
+                "startTimestamp": games["createdAt"],
+                "endTimestamp": end_ts,
                 "duration": duration_str,
                 "position": user_position_str,
                 "yourBall": f"Ball {user_ball_num}",

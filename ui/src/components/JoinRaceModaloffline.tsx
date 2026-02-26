@@ -58,7 +58,43 @@ const JoinRaceModal: React.FC<JoinRaceModalProps> = ({ onClose }) => {
   // Env vars
   const serverUrl = import.meta.env.VITE_PY_SERVER_URL;
   const serverurl1 = import.meta.env.VITE_SERVER_URL;
+  const [videoCountdown, setVideoCountdown] = useState(30);
+  const [canSkipVideo, setCanSkipVideo] = useState(false);
 
+  // Add this effect to handle the countdown
+  useEffect(() => {
+    // TIP: If you have a state that tracks the current step (e.g., currentStep === 'video'),
+    // wrap this logic in an `if` statement so it only counts down when the video is showing.
+    
+    setVideoCountdown(30);
+    setCanSkipVideo(false);
+
+    const timer = setInterval(() => {
+      setVideoCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setCanSkipVideo(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [/* add your step state variable here if needed */]);
+
+  // Helper to ensure autoplay is forced on the URL
+  const getAutoplayUrl = (url: string) => {
+    if (!url) return "";
+    try {
+      const urlObj = new URL(url);
+      urlObj.searchParams.set("autoplay", "1");
+      // urlObj.searchParams.set("mute", "1"); // Uncomment if browser blocks autoplay
+      return urlObj.toString();
+    } catch (e) {
+      return url.includes("?") ? `${url}&autoplay=1` : `${url}?autoplay=1`;
+    }
+  };
   // 1. Fetch User ID
   useEffect(() => {
     const fetchUser = async () => {
@@ -192,12 +228,13 @@ const renderVideoStep = () => (
         </button>
 
         {gameResult?.video_link ? (
-          /* CHANGED: Replaced <video> with <iframe> */
           <iframe
-            src={gameResult.video_link} /* This is your secure backend URL */
+            // Pass the URL through the helper to force ?autoplay=1
+            src={getAutoplayUrl(gameResult.video_link)} 
             title="Race Video"
             className="w-full h-full" 
             frameBorder="0"
+            // Required for YouTube API to allow autoplay
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
           />
@@ -214,9 +251,19 @@ const renderVideoStep = () => (
         </div>
         <button
           onClick={handleVideoComplete}
-          className="px-5 py-2 rounded-full bg-gray-700 hover:bg-gray-600 text-white font-medium flex items-center gap-2 transition"
+          disabled={!canSkipVideo}
+          className={`px-5 py-2 rounded-full font-medium flex items-center gap-2 transition ${
+            canSkipVideo 
+              ? "bg-gray-700 hover:bg-gray-600 text-white cursor-pointer" 
+              : "bg-gray-800 text-gray-500 cursor-not-allowed opacity-70"
+          }`}
         >
-          Continue <SkipForward size={18} />
+          {/* Show the countdown dynamically */}
+          {canSkipVideo ? (
+            <>Continue <SkipForward size={18} /></>
+          ) : (
+            `Wait ${videoCountdown}s`
+          )}
         </button>
       </div>
     </div>
