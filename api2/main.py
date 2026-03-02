@@ -317,7 +317,7 @@ async def process_off_game(game_id,user_id,ball_id):
             {"_id": user["_id"]},
             {"$set": {"total_points": new_points}}
         )
-    if game["rankings"].get("ball_" + str(ball_id),"0") in [1,2,3]:
+    if game["rankings"].get("ball_" + str(ball_id),"0") in [1]:
         await db.users.update_one(
             {"_id": user["_id"]},
             {"$push": {"numberOfWins": {"wins": 1, "timestamp": int(datetime.utcnow().timestamp())}}}
@@ -1714,7 +1714,7 @@ async def submit_rankings(rankings: Dict[str, int]):
                             {"$push": {"points": {"points": points, "timestamp": int(datetime.utcnow().timestamp())}}}
                         )
                         # update numberOfWins if position is 1,2,3
-                        if position in [1, 2, 3]:
+                        if position in [1]:
                             await db.users.update_one(
                                 {"_id": user["_id"]},
                                 {"$push": {"numberOfWins": {"wins": 1, "timestamp": int(datetime.utcnow().timestamp())}}}
