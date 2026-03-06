@@ -179,86 +179,177 @@ const HomePage = () => {
         )}
       </AnimatePresence>
 
-      {/* ===== HERO SECTION ===== */}
-      <main className="flex flex-col items-center justify-center flex-grow text-center px-6 py-12">
-        <h1 className="text-4xl sm:text-6xl font-extrabold bg-gradient-to-r from-indigo-400 to-purple-500 text-transparent bg-clip-text mb-4">
-          Welcome to Pinball Race 🎮
-        </h1>
-        <p className="text-gray-400 text-base sm:text-lg max-w-lg">
-          Compete in real-time pinball races, climb the leaderboard, and win exclusive prizes.
-        </p>
+{/* ===== HERO SECTION (With Video Background Placeholder) ===== */}
+      <main className="relative flex flex-col items-center justify-center flex-grow text-center px-6 py-24 overflow-hidden">
+        {/* Background Video Placeholder */}
+        <div className="absolute inset-0 z-0 bg-[#0a0a0a]">
+          {/* Replace src with your actual auto-looping marble track video */}
+          <video 
+            autoPlay 
+            loop 
+            muted 
+            playsInline
+            className="w-full h-full object-cover opacity-30"
+          >
+            <source src="/marble-loop.mp4" type="video/mp4" />
+          </video>
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#111111]"></div>
+        </div>
 
-        <div className="flex gap-4 mt-8">
-          <button
-            onClick={() => setAuthMode("signup")}
-            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 px-8 py-3 rounded-xl text-sm font-semibold"
-          >
-            Get Started
-          </button>
-          <button
-            onClick={() => setAuthMode("login")}
-            className="border border-gray-600 hover:border-gray-400 px-8 py-3 rounded-xl text-sm font-semibold text-gray-300"
-          >
-            I Already Have an Account
-          </button>
+        <div className="relative z-10 flex flex-col items-center">
+          <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-500 text-transparent bg-clip-text mb-6">
+            Live Marble Racing. Every Day.
+          </h1>
+          
+          <div className="text-gray-300 text-base sm:text-lg max-w-2xl space-y-2 mb-4">
+            <p className="font-semibold text-white text-xl">Enter free. Race live for 1–2 hours daily.</p>
+            <p>Play up to 5 bonus races per day to climb the leaderboard.</p>
+          </div>
+
+          <p className="text-sm text-gray-400 uppercase tracking-widest font-semibold mb-8">
+            Brand sponsored prizes • Real physical track
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-4">
+            <button
+              onClick={() => setAuthMode("signup")}
+              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 px-8 py-4 rounded-xl text-md font-bold text-white shadow-lg shadow-purple-500/30 transition-all"
+            >
+              Join The Next Race
+            </button>
+            <button
+              onClick={() => setAuthMode("login")}
+              className="border border-gray-600 hover:border-gray-300 px-8 py-4 rounded-xl text-md font-semibold text-gray-300 transition-all bg-black/40 backdrop-blur-sm"
+            >
+              I already have an account
+            </button>
+          </div>
         </div>
       </main>
 
-      {/* ===== FEATURES ===== */}
-      <section id="features" className="py-20 px-6 bg-[#111111] border-t border-[#1e1e1e]">
-        <h2 className="text-3xl font-bold text-center mb-10">Why You’ll Love It</h2>
-        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+      {/* ===== LIVE ENERGY SECTION ===== */}
+      <section className="w-full bg-[#161616] border-y border-[#2a2a2a] py-4 px-6 relative z-10">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center md:justify-between gap-6 text-sm font-medium text-gray-300">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+            </span>
+            <span className="text-white font-semibold">We are Live</span> 
+            <span className="text-gray-500 mx-2">|</span> 
+            <span>Next live starts in <span className="text-purple-400 font-mono">03:12:00</span></span>
+          </div>
+          <div className="flex items-center gap-2">
+            👥 47 players joined the last race
+          </div>
+          <div className="flex items-center gap-2">
+            🏁 1,284 races completed
+          </div>
+          <div className="flex items-center gap-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-400 px-3 py-1 rounded-full border border-amber-500/30">
+            🏆 $320 Championship running now
+          </div>
+        </div>
+      </section>
+
+      {/* ===== DAILY FORMAT ===== */}
+      <section className="py-20 px-6 bg-[#111111]">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 text-white">The Daily Format</h2>
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="bg-[#1a1a1a] p-8 rounded-2xl border border-[#2a2a2a] hover:border-indigo-500/50 transition-colors">
+              <h3 className="text-xl font-bold text-white mb-4">🔴 Live Event <span className="block text-sm font-normal text-indigo-400 mt-1">(1–2 Hours Daily)</span></h3>
+              <p className="text-gray-400 text-sm mb-4">Compete in real-time marble races during the official broadcast window.</p>
+              <ul className="text-sm text-gray-300 space-y-2">
+                <li>✨ Major ranking points</li>
+                <li>🎁 Sponsor-backed prize races</li>
+              </ul>
+            </div>
+            
+            <div className="bg-[#1a1a1a] p-8 rounded-2xl border border-[#2a2a2a] hover:border-purple-500/50 transition-colors">
+              <h3 className="text-xl font-bold text-white mb-4">▶️ On-Demand Races <span className="block text-sm font-normal text-purple-400 mt-1">(5 Per Day)</span></h3>
+              <p className="text-gray-400 text-sm mb-4">Enter archived races from our physical track. Choose your marble before watching.</p>
+              <ul className="text-sm text-gray-300 space-y-2">
+                <li>🔒 Results are locked & AI-verified</li>
+                <li>📈 Earn ranking points anytime</li>
+              </ul>
+            </div>
+
+            <div className="bg-[#1a1a1a] p-8 rounded-2xl border border-[#2a2a2a] hover:border-pink-500/50 transition-colors">
+              <h3 className="text-xl font-bold text-white mb-4">📊 Season Rankings <span className="block text-sm font-normal text-pink-400 mt-1">(Ongoing)</span></h3>
+              <p className="text-gray-400 text-sm">Every single race matters. All live and on-demand races contribute to your daily, weekly, and seasonal standings.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ===== HOW IT WORKS ===== */}
+      <section id="how" className="py-20 px-6 bg-[#0a0a0a] border-t border-[#1e1e1e]">
+        <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 text-white">How It Works</h2>
+        <div className="max-w-5xl mx-auto grid sm:grid-cols-2 md:grid-cols-4 gap-8">
           {[
-            {
-              title: "Real-Time Racing",
-              desc: "Play against others in real-time and prove your skills in epic pinball battles."
-            },
-            {
-              title: "Rewards & Achievements",
-              desc: "Earn medals, crowns, and rare in-game rewards for your victories."
-            },
-            {
-              title: "Global Leaderboards",
-              desc: "Compete worldwide and climb the ranks to become the ultimate pinball champion."
-            }
+            { step: "1️⃣", title: "Enter For Free", desc: "No cost. No catch." },
+            { step: "2️⃣", title: "Pick Your Marble", desc: "Choose your marble before the race starts." },
+            { step: "3️⃣", title: "Play Live or On-Demand", desc: "Race in real-time if we're live, or play up to 5 on-demand races using real footage." },
+            { step: "4️⃣", title: "Climb the Board", desc: "Earn points and compete for sponsored prizes." }
+          ].map((item, i) => (
+            <div key={i} className="text-center flex flex-col items-center">
+              <div className="text-4xl mb-4">{item.step}</div>
+              <h3 className="text-lg font-bold text-white mb-2">{item.title}</h3>
+              <p className="text-gray-400 text-sm leading-relaxed">{item.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ===== WHAT MAKES THIS DIFFERENT ===== */}
+      <section id="features" className="py-20 px-6 bg-[#111111] border-t border-[#1e1e1e]">
+        <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 text-white">What Makes This Different</h2>
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+          {[
+            { title: "Real Physical Track", desc: "Every race happens on our custom built marble racetrack." },
+            { title: "AI Verified Results", desc: "Finish order detected instantly and accurately." },
+            { title: "Global Leaderboards", desc: "Compete with players worldwide for the top spot." },
+            { title: "Real Rewards", desc: "Win real prizes funded by official sponsors." }
           ].map((f, i) => (
-            <div
-              key={i}
-              className="bg-[#1a1a1a] p-6 rounded-2xl border border-[#2a2a2a] hover:border-purple-500 transition-all duration-300"
-            >
-              <h3 className="text-lg font-semibold mb-2">{f.title}</h3>
+            <div key={i} className="bg-[#1a1a1a] p-6 rounded-2xl border border-[#2a2a2a]">
+              <h3 className="text-lg font-semibold text-white mb-2">{f.title}</h3>
               <p className="text-gray-400 text-sm">{f.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* ===== HOW IT WORKS ===== */}
-      <section id="how" className="py-20 px-6 text-center bg-[#0f0f0f] border-t border-[#1e1e1e]">
-        <h2 className="text-3xl font-bold mb-10">How It Works</h2>
-        <div className="max-w-3xl mx-auto space-y-8 text-gray-300">
-          <div>
-            <span className="text-purple-400 font-semibold">1. </span>Sign up and create your player profile.
-          </div>
-          <div>
-            <span className="text-purple-400 font-semibold">2. </span>Join a live race or create your own challenge.
-          </div>
-          <div>
-            <span className="text-purple-400 font-semibold">3. </span>Compete, earn rewards, and climb the leaderboard!
-          </div>
+      {/* ===== SPONSOR INTEGRATION ===== */}
+      <section className="py-16 px-6 bg-[#0a0a0a] border-t border-[#1e1e1e] text-center">
+        <h3 className="text-sm font-bold tracking-widest text-gray-500 uppercase mb-8">Powered By Our Sponsors</h3>
+        
+        {/* Replace with actual sponsor logos/images */}
+        <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-60 grayscale hover:grayscale-0 transition-all duration-500 mb-8">
+          <div className="h-8 md:h-12 w-32 bg-gray-800 rounded flex items-center justify-center text-xs text-gray-500 font-mono">LOGO TILE</div>
+          <div className="h-8 md:h-12 w-32 bg-gray-800 rounded flex items-center justify-center text-xs text-gray-500 font-mono">LOGO TILE</div>
+          <div className="h-8 md:h-12 w-32 bg-gray-800 rounded flex items-center justify-center text-xs text-gray-500 font-mono">LOGO TILE</div>
         </div>
+
+        <div className="flex flex-col md:flex-row items-center justify-center gap-4 text-sm text-gray-400 mb-6">
+          <span className="bg-[#1a1a1a] px-4 py-2 rounded-full border border-[#2a2a2a]">"This race sponsored by ___"</span>
+          <span className="bg-[#1a1a1a] px-4 py-2 rounded-full border border-[#2a2a2a]">"Official prize partner"</span>
+        </div>
+
+        <button className="text-indigo-400 hover:text-indigo-300 text-sm font-medium underline underline-offset-4">
+          Become a Sponsor
+        </button>
       </section>
 
-      {/* ===== CTA ===== */}
-      <section className="py-16 px-6 text-center bg-gradient-to-r from-indigo-600 to-purple-600">
-        <h2 className="text-3xl font-bold mb-4">Ready to Play?</h2>
-        <p className="text-white/90 mb-6">Join thousands of racers and start your journey today!</p>
+      {/* ===== BOTTOM CTA ===== */}
+      <section className="py-20 px-6 text-center bg-gradient-to-br from-indigo-900 via-purple-900 to-black border-t border-purple-500/30">
+        <h2 className="text-4xl md:text-5xl font-extrabold text-white mb-4 tracking-tight">Don’t Just Watch. Race.</h2>
         <button
           onClick={() => setAuthMode("signup")}
-          className="bg-white text-purple-700 px-8 py-3 rounded-xl font-semibold hover:bg-gray-100"
+          className="mt-6 bg-white text-purple-900 px-10 py-4 rounded-xl text-lg font-bold hover:bg-gray-200 transition-colors shadow-xl shadow-black/40"
         >
-          Start Racing
+          Enter The Next Live Race
         </button>
+        <p className="text-purple-300 mt-4 text-sm font-medium">Free to join.</p>
       </section>
 
       {/* AUTH MODAL */}
