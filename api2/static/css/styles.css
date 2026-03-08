@@ -353,6 +353,49 @@ td:last-child {
     text-align: center;
 }
 
+/* Base styles shared across all table buttons */
+.save-btn, .preview-btn, .delete-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #ffffff;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+  display: inline-block;
+  font-family: inherit;
+}
+
+/* Button click effect */
+.save-btn:active, .preview-btn:active, .delete-btn:active {
+  transform: scale(0.96);
+}
+
+/* Save Button (Green) */
+.save-btn {
+  background-color: #10b981; 
+}
+.save-btn:hover {
+  background-color: #059669;
+}
+
+/* Preview Button (Blue) */
+.preview-btn {
+  background-color: #3b82f6;
+}
+.preview-btn:hover {
+  background-color: #2563eb;
+}
+
+/* Delete Button (Red) */
+.delete-btn {
+  background-color: #ef4444;
+}
+.delete-btn:hover {
+  background-color: #dc2626;
+}
+
 /* ---------------------------------- */
 /* 6. Responsive Design               */
 /* ---------------------------------- */

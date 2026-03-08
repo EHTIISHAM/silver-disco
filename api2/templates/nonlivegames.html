@@ -1,0 +1,233 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Non Live Games - Admin Dashboard</title>
+  <link rel="stylesheet" href="/static/css/styles.css" />
+  <script src="/static/js/admin.js" defer></script>
+</head>
+<body>
+  <header>
+    <span class="welcome-text">Welcome, {{ username }}</span>
+    <div class="header-nav">
+      <a href="/dashboard" class="nav-link">Dashboard</a>
+      <a href="/past-winners" class="nav-link">Past Winners</a>
+      <a href="/nonlivegames" class="nav-link active">Non Live Games</a>
+    </div>
+    <div class="header-right">
+      <a href="/logout" class="logout-btn">Logout</a>
+    </div>
+  </header>
+
+  <main style="padding: 20px;">
+    <section>
+        <div class="flex-heading">
+            <h3>Available Non Live Games</h3>
+        </div>
+        <div class="cards-row">
+            <div class="card admin-card prizes-table-card">
+                <table id="offline-games-table" style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Game ID</th>
+                            <th>Date</th>
+                            <th>Rankings (JSON)</th>
+                            <th>Result Image</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if offGames %}
+                            {% for p in offGames %}
+                        <tr data-game-id="{{ p._id }}">
+                            <td>{{ loop.index }}</td>
+                            <td>{{ p._id }}</td>
+                            <td>{{ p.createdAt_formatted }}</td>
+                            
+                            <td>
+                            <textarea class="rankings-editor" rows="5" cols="30" style="font-family: monospace; font-size: 12px;">
+                                {{ p.rankings | tojson(indent=2) }}
+                            </textarea>
+                            </td>
+
+                            <td style="text-align: center;">
+                                {% if p.result_image_path %}
+                                    <button type="button" class="preview-btn" onclick="openPreview('{{ p.result_image_path }}')">
+                                        Preview
+                                    </button>
+                                {% else %}
+                                    <span style="color: grey;">No Image</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                <button type="button" class="save-btn" onclick="saveRankings('{{ p._id }}', this)">Save</button>
+                                
+                                <form method="post" action="/api/games/offline/delete" style="display:inline; margin-left: 5px;">
+                                    <input type="hidden" name="game_id" value="{{ p._id }}" />
+                                    <button type="submit" class="delete-btn" onclick="return confirm('Are you sure?')">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: #6b7280; padding: 20px;">No Offline Games available</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+  </main>
+<script>
+  async function refreshGameStatus() {
+    try {
+      const response = await fetch('/api/games/status');
+      if (!response.ok) return;
+      const data = await response.json();
+
+        const ongoingContainer = document.querySelector('.flex-heading');
+        const ongoingSpan = ongoingContainer.querySelector('span');
+        const existingForm = ongoingContainer.querySelector('form');
+
+        if (data.currentGame) {
+        ongoingSpan.textContent = `#${data.currentGame.gameNumber}`;
+
+        // Add Force Finish button if it doesn't exist
+        if (!existingForm) {
+            const form = document.createElement('form');
+            form.method = 'post';
+            form.action = '/api/games/forcefinish';
+            form.style.display = 'inline';
+
+            const btn = document.createElement('button');
+            btn.type = 'submit';
+            btn.className = 'danger-btn';
+            btn.textContent = 'Force Finish';
+            btn.onclick = () => confirm('Are you sure you want to force finish the current game?');
+
+            form.appendChild(btn);
+            ongoingContainer.appendChild(form);
+        }
+        } else {
+        ongoingSpan.textContent = 'No Game';
+        // Remove Force Finish button if it exists
+        if (existingForm) existingForm.remove();
+        }
+
+      // Update next game
+        const nextGameSpan = document.querySelectorAll('.flex-heading span')[1];
+        const createBtn = document.querySelector('.create-btn');
+      if (data.nextGame) {
+        nextGameSpan.textContent = `#${data.nextGame.gameNumber}`;
+        createBtn.disabled = true;
+        createBtn.style.opacity = "0.5";
+        createBtn.style.cursor = "not-allowed";
+      } else {
+        nextGameSpan.textContent = "No Next Game";
+        createBtn.disabled = false;
+        createBtn.style.opacity = "1";
+        createBtn.style.cursor = "pointer";
+      }
+
+    } catch (err) {
+      console.error('Error refreshing game status:', err);
+    }
+  }
+
+
+  // Function to handle Offline Game Type selection
+  function selectOfflineType(value, btnElement) {
+    // 1. Update Hidden Radios
+    const radioId = 'offline' + value;
+    document.getElementById(radioId).checked = true;
+
+    // 2. Update Visual Classes
+    const group = document.getElementById('offlineGameTypeGroup');
+    const buttons = group.querySelectorAll('.toggle-btn');
+    
+    buttons.forEach(btn => btn.classList.remove('active'));
+    btnElement.classList.add('active');
+  }
+  // Run every 5 seconds
+  setInterval(refreshGameStatus, 5000);
+  document.addEventListener("DOMContentLoaded", refreshGameStatus);
+// --- Image Preview Functions ---
+function openPreview(imagePath) {
+    // 1. Construct the path (keep your logic for prefixes if needed)
+    // If you need the static prefix from your previous comments:
+    // const fullPath = "/static/" + imagePath;
+    
+    // OR if the path is already correct:
+    const fullPath = imagePath;
+
+    // 2. Open the URL in a new tab
+    // '_blank' instructs the browser to create a new tab/window
+    window.open(fullPath, '_blank');
+}
+function closePreview() {
+    document.getElementById('imageModal').style.display = 'none';
+}
+
+// Close modal if clicking outside the image
+document.getElementById('imageModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closePreview();
+    }
+});
+
+// --- Save Rankings Function ---
+async function saveRankings(gameId, btnElement) {
+    // Find the textarea associated with the clicked button
+    const row = btnElement.closest('tr');
+    const textarea = row.querySelector('.rankings-editor');
+    const jsonString = textarea.value;
+
+    try {
+        // 1. Validate JSON on client side first
+        const parsedRankings = JSON.parse(jsonString);
+
+        // 2. Visual feedback
+        const originalText = btnElement.innerText;
+        btnElement.innerText = "Saving...";
+        btnElement.disabled = true;
+
+        // 3. Send to Backend
+        const response = await fetch('/api/games/offline/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                game_id: gameId,
+                rankings: parsedRankings
+            })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            alert("Rankings updated successfully!");
+        } else {
+            alert("Error updating: " + (result.detail || "Unknown error"));
+        }
+
+        // Restore button
+        btnElement.innerText = originalText;
+        btnElement.disabled = false;
+
+    } catch (e) {
+        alert("Invalid JSON format! Please check your syntax.");
+        console.error(e);
+    }
+}
+</script>
+  <div id="imagePreviewModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; text-align:center;">
+      <span onclick="document.getElementById('imagePreviewModal').style.display='none'" style="color:white; position:absolute; top:20px; right:40px; font-size:30px; cursor:pointer;">&times;</span>
+      <img id="previewImageSrc" style="max-height:90%; max-width:90%; margin-top:5%;" src="" alt="Result Preview"/>
+  </div>
+</body>
+</html>

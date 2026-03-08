@@ -30,8 +30,9 @@ from dotenv import load_dotenv
 import json
 from jose import jwt, JWTError
 import shutil
-
+from TikTokLive import TikTokLiveClient
 from utils.utils import router as utils_router
+from utils.lp import router as lp_router
 from utils.yolo_model import yolo_model
 
 
@@ -48,6 +49,7 @@ POS_POINT = { "1": 20, "2": 10, "3": 5, "4": 1, "5": 1 , "6": 1, "7": 1, "8": 1,
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB in bytes
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 MAX_OFFLINE_GAMES_PER_DAY = os.getenv("MAX_OFFLINE_GAMES_PER_DAY",3)
+ADMIN_CONFIG_PATH = os.path.join("utils", "admin_config.json")
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
@@ -63,6 +65,7 @@ app.add_middleware(
 
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 app.include_router(utils_router)
+app.include_router(lp_router)
 
 app.mount("/screenshots", StaticFiles(directory="screenshots"), name="screenshots")
 
@@ -849,6 +852,128 @@ async def dashboard(request: Request):
         "max_non_live_games": MAX_OFFLINE_GAMES_PER_DAY,
     }
     return templates.TemplateResponse("dashboard.html", context)
+
+@app.get("/nonlivegames",response_class=HTMLResponse)
+async def nonlivegame(request: Request):
+    try:
+        username = await require_login(request)
+    except HTTPException:
+        return RedirectResponse("/login")
+    off_games = await db.games_off.find().to_list(length=1000)
+    for og in off_games:
+        if "createdAt" in og:
+            og["createdAt_formatted"] = format_timestamp(og["createdAt"])
+        else:
+            off_games.remove(og)
+        if "rankings" in og and isinstance(og["rankings"], dict):
+            # sorted() takes the dict items, sorts them by value (x[1]), and dict() puts them back together
+            og["rankings"] = dict(sorted(og["rankings"].items(), key=lambda item: item[1]))
+    context = {
+        "request": request,
+        "username": username,
+        "offGames": off_games,}
+    
+    return templates.TemplateResponse("nonlivegames.html", context)
+
+def load_config() -> dict:
+    """Safely loads the config, returning a default template if it doesn't exist."""
+    if os.path.exists(ADMIN_CONFIG_PATH):
+        try:
+            with open(ADMIN_CONFIG_PATH, "r") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Error reading config: {e}")
+            
+    # Default structure if file is missing or corrupted
+    return {
+        "next_race_time": None,
+        "is_live": False,
+        "tiktok_live_url": None,
+        "sponsors": []
+    }
+
+def save_config(data: dict):
+    """Writes the dictionary back to the JSON file."""
+    try:
+        with open(ADMIN_CONFIG_PATH, "w") as f:
+            json.dump(data, f, indent=4)
+    except Exception as e:
+        print(f"Error saving config: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save configuration.")
+
+@app.post("/api/admin/set-time")
+async def set_next_race_time(
+    request: Request,
+    next_race_time: str = Form(...) # The HTML form sends this as 'HH:MM'
+):
+    """Handles the timer setting form submission."""
+    # 1. Load existing data so we don't overwrite sponsors
+    config_data = load_config()
+    
+    # 2. Update the time
+    config_data["next_race_time"] = next_race_time
+    
+    # 3. Save back to the JSON file
+    save_config(config_data)
+    
+    # 4. Redirect the admin back to the settings page
+    # status_code 303 (See Other) is best practice for redirecting after a POST
+    return RedirectResponse(url="/landing-settings", status_code=303)
+
+@app.post("/api/admin/set-sponsor")
+async def set_sponsor(
+    request: Request,
+    sponsor_title: str = Form(...),
+    sponsor_logo: Optional[UploadFile] = File(None) # <--- Changed this line
+):
+    """Handles the sponsor configuration and converts the image to base64."""
+    # 1. Read the image file from memory
+    file_bytes = await sponsor_logo.read()
+    
+    # 2. Convert to base64 string
+    base64_encoded = base64.b64encode(file_bytes).decode('utf-8')
+    
+    # 3. Format it as a Data URI so HTML <img> tags can render it natively
+    mime_type = sponsor_logo.content_type or "image/png"
+    base64_data_uri = f"data:{mime_type};base64,{base64_encoded}"
+    
+    # 4. Load current config
+    config_data = load_config()
+    
+    # 5. Update the sponsor data (Storing as a single active sponsor here, 
+    # but you could append to the list if you want multiple)
+    config_data["sponsors"] = [{
+        "name": sponsor_title,
+        "logo": base64_data_uri
+    }]
+    
+    # 6. Save back to the JSON file
+    save_config(config_data)
+    
+    # 7. Redirect back to the settings page
+    return RedirectResponse(url="/landing-settings", status_code=303)
+
+@app.get("/landing-settings", response_class=HTMLResponse)
+async def ls(request: Request):
+    # 1. Verify the admin is logged in
+    try:
+        username = await require_login(request)
+    except HTTPException:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    # 2. (Optional) Load the current configuration to display active settings
+    # This uses the load_config() helper function from the previous snippet
+    current_config = load_config() 
+
+    # 3. Prepare the context for Jinja2
+    context = {
+        "request": request,
+        "username": username,
+        "current_config": current_config
+    }
+    
+    # 4. Render and return the HTML template
+    return templates.TemplateResponse("lp.html", context)
 
 async def get_past_winners_report():
     """
@@ -1762,6 +1887,26 @@ def account_deletion(user_id: str):
         )
     except Exception as e:
         return {"status": "error", "message": str(e)}
+    
+@app.get("is_live")
+async def is_admin_live() -> bool:
+    """
+    Checks if a specific TikTok user is currently live.
+    Returns True if live, False if offline or not found.
+    """
+    # Initialize the client with the admin's username (can be with or without the '@')
+    client = TikTokLiveClient(unique_id="@pinballrace")
+    
+    try:
+        # retrieve_room_info fetches the live room status from TikTok's backend
+        # without actually connecting your server to the live chat websocket.
+        islive = await client.is_live()
+        
+    except Exception as e:
+        print(e)
+        return False
+    
+    return islive
 
 # ---------- Startup: ensure counters exist ----------
 @app.on_event("startup")

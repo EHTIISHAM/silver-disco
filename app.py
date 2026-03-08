@@ -240,6 +240,9 @@ class DetectorThread(threading.Thread):
             ball_rankings = rank_balls_left_to_right(ball_detections)
             current_count = len(ball_rankings)
 
+            # --- Inside your processing loop ---
+
+            # 1. Handle the 10-second "stale" timer (existing logic)
             if current_count > 0:
                 if current_count > initial_ball_count or start_time is None:
                     initial_ball_count = current_count
@@ -254,20 +257,31 @@ class DetectorThread(threading.Thread):
                 initial_ball_count = 0
                 time_tag = False
 
-            # Trigger API Logic
-            if current_count >= 10 or time_tag:
-                self.log(f"🏁 Ball Rankings ready: {ball_rankings}")
-                cv2.imwrite("detected_frame.jpg", annotated_frame)
-                
-                # Fire and forget API call
-                self.trigger_ranking_api(ball_rankings)
-                
-                # Reset timers and sleep to prevent API spam while balls clear
-                start_time = None
-                initial_ball_count = 0
-                time_tag = False
-                self.log("Cooling down for 3 seconds while funnel clears...")
-                time.sleep(3) 
+            # 2. NEW: 2-Second Verification Logic for "10 Balls Detected"
+            # If 10 balls found and we haven't started the 2s timer yet, start it.
+            if (current_count >= 10 or time_tag) and verification_start_time is None:
+                self.log("Target reached. Waiting 2 seconds to stabilize data...")
+                verification_start_time = time.time()
+
+            # 3. Check if the 2-second wait is over
+            if verification_start_time is not None:
+                if time.time() - verification_start_time >= 2:
+                    # This is the "New Data" capture point
+                    self.log(f"🏁 2s elapsed. Sending stabilized rankings: {ball_rankings}")
+                    
+                    cv2.imwrite("detected_frame.jpg", annotated_frame)
+                    
+                    # Fire the API with the rankings detected *after* the 2s wait
+                    self.trigger_ranking_api(ball_rankings)
+                    
+                    # Reset everything
+                    start_time = None
+                    initial_ball_count = 0
+                    time_tag = False
+                    verification_start_time = None # Reset our 2s timer
+                    
+                    self.log("Cooling down for 3 seconds while funnel clears...")
+                    time.sleep(3)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break

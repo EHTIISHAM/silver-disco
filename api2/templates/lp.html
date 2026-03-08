@@ -1,0 +1,153 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Landing Settings - Admin Dashboard</title>
+  <link rel="stylesheet" href="/static/css/styles.css" />
+  <script src="/static/js/admin.js" defer></script>
+  <style>
+    /* Specific styles for the settings forms */
+    .settings-card {
+      max-width: 600px;
+      margin-bottom: 30px;
+      padding: 20px;
+      background: #ffffff; /* Adjust to your admin theme */
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .form-group {
+      margin-bottom: 15px;
+      display: flex;
+      flex-direction: column;
+    }
+    .form-group label {
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #374151;
+    }
+    .form-control {
+      padding: 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    .time-input {
+      font-size: 1.5rem;
+      padding: 10px;
+      text-align: center;
+      cursor: pointer;
+    }
+    /* Image Preview Box */
+    .preview-box {
+      width: 100%;
+      height: 200px;
+      border: 2px dashed #d1d5db;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 10px;
+      overflow: hidden;
+      background: #f9fafb;
+    }
+    .preview-box img {
+      max-width: 100%;
+      max-height: 100%;
+      display: none; /* Hidden until image is selected */
+    }
+    .preview-placeholder {
+      color: #9ca3af;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="welcome-text">Welcome, {{ username }}</span>
+    <div class="header-nav">
+      <a href="/dashboard" class="nav-link">Dashboard</a>
+      <a href="/past-winners" class="nav-link">Past Winners</a>
+      <a href="/nonlivegames" class="nav-link">Non Live Games</a>
+      <a href="/landing-settings" class="nav-link active">Landing Settings</a>
+    </div>
+    <div class="header-right">
+      <a href="/logout" class="logout-btn">Logout</a>
+    </div>
+  </header>
+
+  <main style="padding: 20px;">
+    
+    <div class="flex-heading" style="margin-bottom: 20px;">
+        <h3>Landing Page Configurations</h3>
+    </div>
+
+<div class="card admin-card settings-card">
+      <h4 style="margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">Set Next Live Race Time</h4>
+      <form id="timer-form" action="/api/admin/set-time" method="POST">
+        <div class="form-group">
+          <label for="next_race_time">Select Time</label>
+          <input type="time" id="next_race_time" name="next_race_time" class="form-control time-input" value="{{ current_config.get('next_race_time', '') }}" required>
+        </div>
+        <button type="submit" class="save-btn" style="width: 100%; font-size: 16px; padding: 12px;">Save Timer</button>
+      </form>
+    </div>
+
+    <div class="card admin-card settings-card">
+      <h4 style="margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">Active Sponsor Details</h4>
+      <form id="sponsor-form" action="/api/admin/set-sponsor" method="POST" enctype="multipart/form-data">
+        
+        {% set active_sponsor = current_config.get('sponsors', [])[0] if current_config.get('sponsors') else None %}
+
+        <div class="form-group">
+          <label for="sponsor_title">Sponsor Title</label>
+          <input type="text" id="sponsor_title" name="sponsor_title" class="form-control" placeholder="e.g., Wander Rings" value="{{ active_sponsor.name if active_sponsor else '' }}" required>
+        </div>
+
+        <div class="form-group">
+          <label for="sponsor_logo">Upload Sponsor Logo</label>
+          <input type="file" id="sponsor_logo" name="sponsor_logo" class="form-control" accept="image/*" onchange="previewImage(event)" {% if not active_sponsor %}required{% endif %}>
+          
+          <div class="preview-box" id="preview-container">
+            {% if active_sponsor and active_sponsor.logo %}
+                <span class="preview-placeholder" id="preview-text" style="display: none;">Image preview will appear here</span>
+                <img id="logo-preview" src="{{ active_sponsor.logo }}" alt="Sponsor Logo Preview" style="display: block;">
+            {% else %}
+                <span class="preview-placeholder" id="preview-text">Image preview will appear here</span>
+                <img id="logo-preview" src="" alt="Sponsor Logo Preview">
+            {% endif %}
+          </div>
+        </div>
+
+        <button type="submit" class="save-btn" style="width: 100%; font-size: 16px; padding: 12px;">Save Sponsor</button>
+      </form>
+    </div>
+  </main>
+
+  <script>
+    function previewImage(event) {
+      const fileInput = event.target;
+      const file = fileInput.files[0];
+      const previewImg = document.getElementById('logo-preview');
+      const previewText = document.getElementById('preview-text');
+
+      if (file) {
+        // Create a temporary URL for the selected file and set it as the image source
+        const objectUrl = URL.createObjectURL(file);
+        previewImg.src = objectUrl;
+        
+        // Show the image, hide the placeholder text
+        previewImg.style.display = 'block';
+        previewText.style.display = 'none';
+
+        // Clean up memory after image loads
+        previewImg.onload = () => URL.revokeObjectURL(objectUrl);
+      } else {
+        // Reset if user cancels file selection
+        previewImg.style.display = 'none';
+        previewImg.src = '';
+        previewText.style.display = 'block';
+      }
+    }
+  </script>
+</body>
+</html>

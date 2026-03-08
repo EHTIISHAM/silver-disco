@@ -23,7 +23,7 @@ const HomePage = () => {
   const [confirm, setConfirm] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
+  const [landingData, setLandingData] = useState<any>(null);
   const serverUrl: string | undefined = import.meta.env.VITE_SERVER_URL;
   const navigate = useNavigate();
 
@@ -34,6 +34,10 @@ const HomePage = () => {
       setChecking(false);
       return;
     }
+    axios
+      .get(`${import.meta.env.VITE_PY_SERVER_URL}/landing`)
+      .then((res) => setLandingData(res.data))
+      .catch((err) => console.error("Failed to fetch landing data", err));
     axios
       .get(`${serverUrl}/home`, { withCredentials: true })
       .then(() => navigate("/home"))
@@ -230,21 +234,33 @@ const HomePage = () => {
       {/* ===== LIVE ENERGY SECTION ===== */}
       <section className="w-full bg-[#161616] border-y border-[#2a2a2a] py-4 px-6 relative z-10">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center md:justify-between gap-6 text-sm font-medium text-gray-300">
+          
           <div className="flex items-center gap-2">
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-            </span>
-            <span className="text-white font-semibold">We are Live</span> 
-            <span className="text-gray-500 mx-2">|</span> 
-            <span>Next live starts in <span className="text-purple-400 font-mono">03:12:00</span></span>
+            {landingData?.is_live ? (
+              <>
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                </span>
+                <span className="text-white font-semibold">We are Live</span> 
+              </>
+            ) : (
+              <>
+                <span className="text-gray-400 font-semibold">Currently Offline</span> 
+                <span className="text-gray-500 mx-2">|</span> 
+                <span>Next live starts at <span className="text-purple-400 font-mono">{landingData?.next_race_time || "TBD"}</span></span>
+              </>
+            )}
           </div>
+
           <div className="flex items-center gap-2">
-            👥 47 players joined the last race
+            👥 {landingData?.last_race_players?.toLocaleString() || 0} players joined the last race
           </div>
+          
           <div className="flex items-center gap-2">
-            🏁 1,284 races completed
+            🏁 {landingData?.total_races?.toLocaleString() || 0} races completed
           </div>
+          
           <div className="flex items-center gap-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-400 px-3 py-1 rounded-full border border-amber-500/30">
             🏆 $320 Championship running now
           </div>
@@ -319,27 +335,42 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* ===== SPONSOR INTEGRATION ===== */}
+        {/* ===== SPONSOR INTEGRATION ===== */}
       <section className="py-16 px-6 bg-[#0a0a0a] border-t border-[#1e1e1e] text-center">
         <h3 className="text-sm font-bold tracking-widest text-gray-500 uppercase mb-8">Powered By Our Sponsors</h3>
         
-        {/* Replace with actual sponsor logos/images */}
-        <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-60 grayscale hover:grayscale-0 transition-all duration-500 mb-8">
-          <div className="h-8 md:h-12 w-32 bg-gray-800 rounded flex items-center justify-center text-xs text-gray-500 font-mono">LOGO TILE</div>
-          <div className="h-8 md:h-12 w-32 bg-gray-800 rounded flex items-center justify-center text-xs text-gray-500 font-mono">LOGO TILE</div>
-          <div className="h-8 md:h-12 w-32 bg-gray-800 rounded flex items-center justify-center text-xs text-gray-500 font-mono">LOGO TILE</div>
+        {/* Dynamic Sponsor Logos */}
+        <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-80 hover:opacity-100 transition-all duration-500 mb-8">
+          {landingData?.sponsors && landingData.sponsors.length > 0 ? (
+            landingData.sponsors.map((sponsor: any, idx: number) => (
+              <img 
+                key={idx} 
+                src={sponsor.logo} 
+                alt={sponsor.name} 
+                className="h-12 md:h-16 w-auto object-contain" 
+              />
+            ))
+          ) : (
+            <div className="h-8 md:h-12 px-6 bg-gray-800 rounded flex items-center justify-center text-xs text-gray-500 font-mono">AVAILABLE SPONSOR SPOT</div>
+          )}
         </div>
 
-        <div className="flex flex-col md:flex-row items-center justify-center gap-4 text-sm text-gray-400 mb-6">
-          <span className="bg-[#1a1a1a] px-4 py-2 rounded-full border border-[#2a2a2a]">"This race sponsored by ___"</span>
-          <span className="bg-[#1a1a1a] px-4 py-2 rounded-full border border-[#2a2a2a]">"Official prize partner"</span>
-        </div>
+        {/* Dynamic Sponsor Title */}
+        {landingData?.sponsors && landingData.sponsors.length > 0 && (
+          <div className="flex flex-col md:flex-row items-center justify-center gap-4 text-sm text-gray-400 mb-6">
+            <span className="bg-[#1a1a1a] px-4 py-2 rounded-full border border-[#2a2a2a]">
+              "This race sponsored by {landingData.sponsors[0].name}"
+            </span>
+            <span className="bg-[#1a1a1a] px-4 py-2 rounded-full border border-[#2a2a2a]">"Official prize partner"</span>
+          </div>
+        )}
 
         <button className="text-indigo-400 hover:text-indigo-300 text-sm font-medium underline underline-offset-4">
           Become a Sponsor
         </button>
       </section>
 
+      
       {/* ===== BOTTOM CTA ===== */}
       <section className="py-20 px-6 text-center bg-gradient-to-br from-indigo-900 via-purple-900 to-black border-t border-purple-500/30">
         <h2 className="text-4xl md:text-5xl font-extrabold text-white mb-4 tracking-tight">Don’t Just Watch. Race.</h2>
