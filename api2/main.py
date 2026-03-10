@@ -871,7 +871,9 @@ async def nonlivegame(request: Request):
     context = {
         "request": request,
         "username": username,
-        "offGames": off_games,}
+        "offGames": off_games,
+        "max_non_live_games": MAX_OFFLINE_GAMES_PER_DAY,
+}
     
     return templates.TemplateResponse("nonlivegames.html", context)
 
@@ -904,20 +906,29 @@ def save_config(data: dict):
 @app.post("/api/admin/set-time")
 async def set_next_race_time(
     request: Request,
-    next_race_time: str = Form(...) # The HTML form sends this as 'HH:MM'
+    next_race_time: str = Form(...) # The HTML form sends this as 'YYYY-MM-DDTHH:MM'
 ):
-    """Handles the timer setting form submission."""
-    # 1. Load existing data so we don't overwrite sponsors
+    """Handles the timer setting, converting the datetime to a timestamp."""
     config_data = load_config()
     
-    # 2. Update the time
-    config_data["next_race_time"] = next_race_time
+    try:
+        # 1. Parse the string from the HTML datetime-local input
+        dt = datetime.strptime(next_race_time, "%Y-%m-%dT%H:%M")
+        
+        # 2. Force minutes, seconds, and microseconds to 0 (rounding to the hour)
+        dt = dt.replace(minute=0, second=0, microsecond=0)
+        
+        # 3. Convert to a UNIX timestamp (integer)
+        timestamp = int(dt.timestamp())
+        
+        # 4. Save the timestamp to config
+        config_data["next_race_time"] = timestamp
+    except ValueError as e:
+        print(f"Error parsing date: {e}")
+        raise HTTPException(status_code=400, detail="Invalid date format provided.")
     
-    # 3. Save back to the JSON file
     save_config(config_data)
     
-    # 4. Redirect the admin back to the settings page
-    # status_code 303 (See Other) is best practice for redirecting after a POST
     return RedirectResponse(url="/landing-settings", status_code=303)
 
 @app.post("/api/admin/set-sponsor")
@@ -961,18 +972,30 @@ async def ls(request: Request):
     except HTTPException:
         return RedirectResponse(url="/login", status_code=303)
     
-    # 2. (Optional) Load the current configuration to display active settings
-    # This uses the load_config() helper function from the previous snippet
+    # 2. Load the current configuration
     current_config = load_config() 
 
-    # 3. Prepare the context for Jinja2
+    # 3. Format the saved timestamp back to HTML format for the frontend
+    formatted_time = ""
+    saved_timestamp = current_config.get("next_race_time")
+    if saved_timestamp:
+        try:
+            # Convert timestamp back to a datetime object
+            dt = datetime.fromtimestamp(saved_timestamp)
+            # Format exactly as HTML datetime-local expects: YYYY-MM-DDTHH:MM
+            formatted_time = dt.strftime("%Y-%m-%dT%H:%M")
+        except Exception as e:
+            print(f"Error formatting timestamp: {e}")
+
+    # 4. Prepare the context for Jinja2
     context = {
         "request": request,
         "username": username,
-        "current_config": current_config
+        "current_config": current_config,
+        "formatted_time": formatted_time # Inject our formatted time
     }
     
-    # 4. Render and return the HTML template
+    # 5. Render and return the HTML template
     return templates.TemplateResponse("lp.html", context)
 
 async def get_past_winners_report():

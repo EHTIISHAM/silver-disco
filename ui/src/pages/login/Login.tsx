@@ -26,7 +26,20 @@ const HomePage = () => {
   const [landingData, setLandingData] = useState<any>(null);
   const serverUrl: string | undefined = import.meta.env.VITE_SERVER_URL;
   const navigate = useNavigate();
-
+  const formatRaceTime = (timestamp: number | null) => {
+  if (!timestamp) return "TBD";
+  
+  // Multiply by 1000 to convert seconds to milliseconds for JS Date
+  const date = new Date(timestamp * 1000); 
+  
+  // Format it to look like "Mar 10 at 5:00 PM"
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  });
+};
   // ✅ Check session
   useEffect(() => {
     if (!serverUrl) {
@@ -237,21 +250,26 @@ const HomePage = () => {
           
           <div className="flex items-center gap-2">
             {landingData?.is_live ? (
-              <>
+                <>
                 <span className="relative flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
                 </span>
                 <span className="text-white font-semibold">We are Live</span> 
-              </>
+                </>
             ) : (
-              <>
+                <>
                 <span className="text-gray-400 font-semibold">Currently Offline</span> 
                 <span className="text-gray-500 mx-2">|</span> 
-                <span>Next live starts at <span className="text-purple-400 font-mono">{landingData?.next_race_time || "TBD"}</span></span>
-              </>
+                <span>
+                    Next live starts at{" "}
+                    <span className="text-purple-400 font-mono">
+                    {formatRaceTime(landingData?.next_race_time)}
+                    </span>
+                </span>
+                </>
             )}
-          </div>
+            </div>
 
           <div className="flex items-center gap-2">
             👥 {landingData?.last_race_players?.toLocaleString() || 0} players joined the last race
@@ -359,14 +377,16 @@ const HomePage = () => {
         {landingData?.sponsors && landingData.sponsors.length > 0 && (
           <div className="flex flex-col md:flex-row items-center justify-center gap-4 text-sm text-gray-400 mb-6">
             <span className="bg-[#1a1a1a] px-4 py-2 rounded-full border border-[#2a2a2a]">
-              "This race sponsored by {landingData.sponsors[0].name}"
+              {landingData.sponsors[0].name}
             </span>
-            <span className="bg-[#1a1a1a] px-4 py-2 rounded-full border border-[#2a2a2a]">"Official prize partner"</span>
           </div>
         )}
 
-        <button className="text-indigo-400 hover:text-indigo-300 text-sm font-medium underline underline-offset-4">
-          Become a Sponsor
+            <button 
+            className="text-indigo-400 hover:text-indigo-300 text-sm font-medium underline underline-offset-4" 
+            onClick={() => window.location.href = 'mailto:thelaserlad1@gmail.com'}
+            >
+              Become a Sponsor
         </button>
       </section>
 

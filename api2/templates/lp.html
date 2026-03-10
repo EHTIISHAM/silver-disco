@@ -81,15 +81,22 @@
         <h3>Landing Page Configurations</h3>
     </div>
 
-<div class="card admin-card settings-card">
-      <h4 style="margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">Set Next Live Race Time</h4>
-      <form id="timer-form" action="/api/admin/set-time" method="POST">
+    <div class="card admin-card settings-card">
+    <h4 style="margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">Set Next Live Race Time</h4>
+    <form id="timer-form" action="/api/admin/set-time" method="POST">
         <div class="form-group">
-          <label for="next_race_time">Select Time</label>
-          <input type="time" id="next_race_time" name="next_race_time" class="form-control time-input" value="{{ current_config.get('next_race_time', '') }}" required>
+        <label for="next_race_time">Select Date and Hour</label>
+        <input 
+            type="datetime-local" 
+            id="next_race_time" 
+            name="next_race_time" 
+            class="form-control time-input" 
+            value="{{ formatted_time }}" 
+            step="3600" 
+            required>
         </div>
         <button type="submit" class="save-btn" style="width: 100%; font-size: 16px; padding: 12px;">Save Timer</button>
-      </form>
+    </form>
     </div>
 
     <div class="card admin-card settings-card">
