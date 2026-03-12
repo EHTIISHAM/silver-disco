@@ -398,40 +398,49 @@ useEffect(() => {
           ) : (
             recentRaces.map((race) => (
             <div
-                key={`${race.raceId}-${race.createdAt}`}
-                className="flex items-center justify-between bg-[#1a1a1a] p-3 rounded-xl mb-2 hover:bg-gray-800 transition"
-              >
-                <div className="flex items-center space-x-3">
-                  <div>
-                    <p className="text-sm">
-                      {"#"}{race.raceId}
-                    </p>
-                   <p className="text-sm text-gray-400">
+            key={`${race.raceId}-${race.createdAt}`}
+            className="flex items-center justify-between bg-[#1a1a1a] p-3 rounded-xl  mb-2 hover:bg-gray-800 transition"
+            >
+            {/* Added flex-1 and min-w-0 to allow this container to shrink instead of expanding past the screen */}
+            <div className="flex items-center space-x-3 flex-1 min-w-0">
+                <div className="min-w-0 w-full">
+                
+                {/* Added truncate to prevent long IDs from breaking layout */}
+                <p className="text-sm truncate">
+                    {"#"}{race.raceId}
+                </p>
+                
+                {/* Added truncate to prevent long usernames from breaking layout */}
+                <p className="text-sm text-gray-400 truncate">
+                    <span className="text-[#8b6fed] text-xs font-bold">{race.isOffline ? race.position : "Winner"}</span> •{" "}
+                    <span className="text-[#767676]">{race.username || "No Winner"}</span>
+                </p>
 
-                      <span className="text-[#8b6fed] text-xs font-bold">{race.isOffline ? race.position : "Winner"}</span> •{" "}
-                      <span className="text-[#767676]">{race.username || "No Winner"}</span>
-                    </p>
-
-                    <div className="mt-1 flex items-center space-x-2">
-                    {race.top5Balls && Array.isArray(race.top5Balls) ? (
-                            race.top5Balls.map((ballNum: number, bIndex: number) => (
-                                <img 
-                                key={bIndex} 
-                                // Convert number to string to match your image map keys
-                                src={ballImages[String(ballNum)]} 
-                                alt={`Ball ${ballNum}`} 
-                                className="w-5 h-5 object-contain" 
-                                />
-                            ))
-                            ) : (
-                            <span className="text-xs text-gray-500">No balls data</span>
-                            )}
-                    </div>
-
-                  </div>
+                {/* Swapped space-x-2 for gap-2 and added flex-wrap so balls drop to the next line if needed */}
+                <div className="mt-1 flex items-center gap-2 min-w-0 w-full">
+                {race.top5Balls && Array.isArray(race.top5Balls) ? (
+                    race.top5Balls.map((ballNum: number, bIndex: number) => (
+                    <img 
+                        key={bIndex} 
+                        src={ballImages[String(ballNum)]} 
+                        alt={`Ball ${ballNum}`} 
+                        /* 1. Removed flex-shrink-0 
+                        2. Added shrink (allows image to scale down)
+                        3. Added min-w-0 (prevents flexbox from forcing the image to its native minimum width)
+                        */
+                        className="w-5 h-5 object-contain shrink min-w-0" 
+                    />
+                    ))
+                ) : (
+                    <span className="text-xs text-gray-500">No balls data</span>
+                )}
                 </div>
-                <span className="text-white-400 text-lg">&gt;</span>
-              </div>
+    </div>
+  </div>
+  
+  {/* Added ml-2 and flex-shrink-0 so the arrow always stays glued to the right edge and remains visible */}
+  <span className="text-white-400 text-lg ml-2 flex-shrink-0">&gt;</span>
+</div>
             ))
           )}
         </div>

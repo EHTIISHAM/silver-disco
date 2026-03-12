@@ -17,8 +17,8 @@ from typing import Optional, List, Dict, Any
 
 from urllib3 import request
 from bson import ObjectId
-from fastapi import FastAPI, Request, Form, Response, HTTPException, Query, Depends, UploadFile, File, BackgroundTasks,status
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, StreamingResponse
+from fastapi import FastAPI, Request, Form, Response, HTTPException, Query, Depends, UploadFile, File, BackgroundTasks,status 
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -28,6 +28,8 @@ from passlib.hash import bcrypt
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import json
+import zipfile
+import csv
 from jose import jwt, JWTError
 import shutil
 from TikTokLive import TikTokLiveClient
@@ -77,6 +79,9 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 mongo = AsyncIOMotorClient(MONGO_URI)
 db = mongo[DB_NAME]
 
+EXPORT_DIR = "./db_exports"
+ZIP_PATH = f"{EXPORT_DIR}/database_export.zip"
+
 class UserEmail(BaseModel):
     email: str
 
@@ -113,6 +118,49 @@ class OfflineGameRequest(BaseModel):
     userId: str
     ball_id: int
 # a path to stream video based on _id input
+
+
+async def generate_database_export():
+    """Fetches all collections, writes them to CSVs, and zips them up."""
+    os.makedirs(EXPORT_DIR, exist_ok=True)
+    
+    # Get all collections in the database
+    collections = await db.list_collection_names()
+    csv_files = []
+    
+    for coll_name in collections:
+        cursor = db[coll_name].find({})
+        docs = await cursor.to_list(length=None) 
+        
+        if not docs:
+            continue
+            
+        # MongoDB documents can have dynamic keys. 
+        # This scans all docs to find every possible column header.
+        fieldnames = set()
+        for doc in docs:
+            fieldnames.update(doc.keys())
+        fieldnames = list(fieldnames)
+        
+        csv_path = os.path.join(EXPORT_DIR, f"{coll_name}.csv")
+        csv_files.append(csv_path)
+        
+        # Write to CSV
+        with open(csv_path, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for doc in docs:
+                # Convert the MongoDB ObjectId to a string so it writes to CSV cleanly
+                if '_id' in doc:
+                    doc['_id'] = str(doc['_id'])
+                writer.writerow(doc)
+                
+    # Bundle all CSVs into a single ZIP file for the client
+    with zipfile.ZipFile(ZIP_PATH, 'w') as zipf:
+        for file in csv_files:
+            zipf.write(file, os.path.basename(file))
+            
+    print("Daily database export completed and zipped.")
 
 
 @app.post("/api/games/offline")
@@ -1930,6 +1978,26 @@ async def is_admin_live() -> bool:
         return False
     
     return islive
+
+@app.get("/api/admin/download-database")
+async def download_database(
+    request : Request
+):
+    try:
+        username = await require_login(request)
+    except HTTPException:
+        return RedirectResponse("/login")
+    await generate_database_export()
+    """Allows the client to download the latest database snapshot."""
+    if not os.path.exists(ZIP_PATH):
+        # If the file doesn't exist yet, you can trigger a manual generation or throw an error
+        raise HTTPException(status_code=404, detail="Export file not ready yet. Please try again later.")
+        
+    return FileResponse(
+        path=ZIP_PATH, 
+        media_type="application/zip", 
+        filename="pinballrace_db_backup.zip"
+    )
 
 # ---------- Startup: ensure counters exist ----------
 @app.on_event("startup")
