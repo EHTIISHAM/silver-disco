@@ -8,6 +8,7 @@ import { MdClose, MdMenu } from "react-icons/md";
 import { FaGoogle, FaTwitch } from "react-icons/fa";
 import { SiTiktok } from "react-icons/si";
 import logo from "../../assets/orilogo.png";
+import demo from "../../assets/demo.mp4";
 import Footer from "../../components/Footer";
 
 type Mode = "login" | "signup" | null;
@@ -26,20 +27,22 @@ const HomePage = () => {
   const [landingData, setLandingData] = useState<any>(null);
   const serverUrl: string | undefined = import.meta.env.VITE_SERVER_URL;
   const navigate = useNavigate();
-  const formatRaceTime = (timestamp: number | null) => {
+  const getHoursUntilRace = (timestamp: number | null) => {
   if (!timestamp) return "TBD";
   
-  // Multiply by 1000 to convert seconds to milliseconds for JS Date
-  const date = new Date(timestamp * 1000); 
+  const targetTimeMs = timestamp * 1000;
+  const currentTimeMs = Date.now();
   
-  // Format it to look like "Mar 10 at 5:00 PM"
-  return date.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit'
-  });
-};
+  const diffMs = targetTimeMs - currentTimeMs;
+  
+  // If the race time has already passed
+  if (diffMs <= 0) return "0 hours"; 
+  
+  // Convert milliseconds to hours (using Math.ceil to round up to the nearest hour)
+  const hours = Math.ceil(diffMs / (1000 * 60 * 60)); 
+  
+  return `${hours} hour${hours !== 1 ? 's' : ''}`;
+}; 
   // ✅ Check session
   useEffect(() => {
     if (!serverUrl) {
@@ -208,7 +211,7 @@ const HomePage = () => {
             playsInline
             className="w-full h-full object-cover opacity-30"
           >
-            <source src="/marble-loop.mp4" type="video/mp4" />
+            <source src={demo} type="video/mp4" />
           </video>
           <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#111111]"></div>
         </div>
@@ -262,11 +265,11 @@ const HomePage = () => {
                 <span className="text-gray-400 font-semibold">Currently Offline</span> 
                 <span className="text-gray-500 mx-2">|</span> 
                 <span>
-                    Next live starts at{" "}
-                    <span className="text-purple-400 font-mono">
-                    {formatRaceTime(landingData?.next_race_time)}
-                    </span>
+                Next Race starts in{" "}
+                <span className="text-purple-400 font-mono">
+                    {getHoursUntilRace(landingData?.next_race_time)}
                 </span>
+            </span>
                 </>
             )}
             </div>
@@ -279,9 +282,6 @@ const HomePage = () => {
             🏁 {landingData?.total_races?.toLocaleString() || 0} races completed
           </div>
           
-          <div className="flex items-center gap-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-400 px-3 py-1 rounded-full border border-amber-500/30">
-            🏆 $320 Championship running now
-          </div>
         </div>
       </section>
 
@@ -300,7 +300,7 @@ const HomePage = () => {
             </div>
             
             <div className="bg-[#1a1a1a] p-8 rounded-2xl border border-[#2a2a2a] hover:border-purple-500/50 transition-colors">
-              <h3 className="text-xl font-bold text-white mb-4">▶️ On-Demand Races <span className="block text-sm font-normal text-purple-400 mt-1">(5 Per Day)</span></h3>
+              <h3 className="text-xl font-bold text-white mb-4">▶️ On-Demand Races <span className="block text-sm font-normal text-purple-400 mt-1">({landingData?.max_offline_race?.toLocaleString() || "5"} Per Day)</span></h3>
               <p className="text-gray-400 text-sm mb-4">Enter archived races from our physical track. Choose your marble before watching.</p>
               <ul className="text-sm text-gray-300 space-y-2">
                 <li>🔒 Results are locked & AI-verified</li>
@@ -317,17 +317,20 @@ const HomePage = () => {
       </section>
 
       {/* ===== HOW IT WORKS ===== */}
-      <section id="how" className="py-20 px-6 bg-[#0a0a0a] border-t border-[#1e1e1e]">
+        <section id="how" className="py-20 px-6 bg-[#0a0a0a] border-t border-[#1e1e1e]">
         <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 text-white">How It Works</h2>
         <div className="max-w-5xl mx-auto grid sm:grid-cols-2 md:grid-cols-4 gap-8">
           {[
-            { step: "1️⃣", title: "Enter For Free", desc: "No cost. No catch." },
-            { step: "2️⃣", title: "Pick Your Marble", desc: "Choose your marble before the race starts." },
-            { step: "3️⃣", title: "Play Live or On-Demand", desc: "Race in real-time if we're live, or play up to 5 on-demand races using real footage." },
-            { step: "4️⃣", title: "Climb the Board", desc: "Earn points and compete for sponsored prizes." }
+            { step: "1", title: "Enter For Free", desc: "No cost. No catch." },
+            { step: "2", title: "Pick Your Marble", desc: "Choose your marble before the race starts." },
+            { step: "3", title: "Play Live or On-Demand", desc: "Race in real-time if we're live, or play up to " + (landingData?.max_offline_race?.toLocaleString() || "5") + " on-demand races using real footage." },
+            { step: "4", title: "Climb the Board", desc: "Earn points and compete for sponsored prizes." }
           ].map((item, i) => (
             <div key={i} className="text-center flex flex-col items-center">
-              <div className="text-4xl mb-4">{item.step}</div>
+              {/* Styled Purple Box */}
+              <div className="w-12 h-12 mb-4 flex items-center justify-center bg-purple-600 text-white text-2xl font-bold rounded-xl shadow-lg shadow-purple-500/20">
+                {item.step}
+              </div>
               <h3 className="text-lg font-bold text-white mb-2">{item.title}</h3>
               <p className="text-gray-400 text-sm leading-relaxed">{item.desc}</p>
             </div>

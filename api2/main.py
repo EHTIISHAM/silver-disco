@@ -664,20 +664,6 @@ async def scheduler():
         # 1️⃣ Fetch all 'Not Started' games in order
         games_cursor = db.games.find({"status": "Not Started"}).sort("createdAt", 1)
         games = await games_cursor.to_list(length=None)
-        # fetch offline games too
-        offline_games_cursor = db.games_off.find().sort("createdAt", 1)
-        # delete the games that are older than 7 day
-        offline_games = await offline_games_cursor.to_list(length=None)
-        seven_days_ago = datetime.utcnow() - timedelta(days=7)
-        for og in offline_games:
-            # check if the og is empty or not
-            if og.get('createdAt', None) is None:
-                continue
-            created_at = datetime.utcfromtimestamp(og["createdAt"] / 1000)
-            if created_at < seven_days_ago:
-                # get the deleted _id and delete the video and frame files too
-                await db.games_off.delete_one({"_id": og["_id"]})
-
                 
         if not games:
             await asyncio.sleep(30)
@@ -687,8 +673,6 @@ async def scheduler():
 
         # 2️⃣ Start with the first game as 'initial'
         initial_game = games[0]
-        current_start = datetime.utcfromtimestamp(initial_game["createdAt"] / 1000) \
-                        + timedelta(minutes=initial_game["timerTillNextGame"])
 
         # process all games one by one
         for i, game in enumerate(games):
@@ -1959,8 +1943,8 @@ def account_deletion(user_id: str):
     except Exception as e:
         return {"status": "error", "message": str(e)}
     
-@app.get("is_live")
-async def is_admin_live() -> bool:
+@app.get("/is_live")
+async def is_admin_live():
     """
     Checks if a specific TikTok user is currently live.
     Returns True if live, False if offline or not found.
@@ -1975,9 +1959,9 @@ async def is_admin_live() -> bool:
         
     except Exception as e:
         print(e)
-        return False
+        return {"is_live":False}
     
-    return islive
+    return {"is_live": islive}
 
 @app.get("/api/admin/download-database")
 async def download_database(

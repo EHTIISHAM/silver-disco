@@ -60,6 +60,7 @@ class DoorMonitorThread(threading.Thread):
         self.status = "UNKNOWN"
         self.color = "#000000" 
         self.last_sent_status = None
+        self.last_send_time = 0
 
         self._init_camera()
 
@@ -68,11 +69,14 @@ class DoorMonitorThread(threading.Thread):
             self.cap = cv2.VideoCapture(self.camera_index)
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
             self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         except Exception as e:
             self.log(f"Door Cam Init Error: {e}")
             self.cap = None
 
     def run(self):
+        consecutive_failures = 0
+
         while self.running:
             if self.paused:
                 time.sleep(0.5)
@@ -82,45 +86,64 @@ class DoorMonitorThread(threading.Thread):
                 self.status = "CAM ERROR"
                 self.color = "#FFA500"
                 time.sleep(1)
+                self._init_camera()
                 continue
 
             ret, frame = self.cap.read()
-            if ret:
-                try:
-                    # Dynamically check resolution to avoid crashes if a different camera is used
-                    h, w, _ = frame.shape
-                    if h < 350 or w < 800:
-                        self.log("Door Cam Warning: Resolution too low for hardcoded ROI.")
-                        time.sleep(1)
-                        continue
-
-                    roi = frame[210:350, 260:800] 
-                    gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-                    blurred_roi = cv2.GaussianBlur(gray_roi, (5, 5), 0)
-                    edges = cv2.Canny(blurred_roi, 50, 150)
-                    edge_pixel_count = cv2.countNonZero(edges)
-                    
-                    threshold = int(self.config.get("threshold", 500))
-                    
-                    if edge_pixel_count > threshold:
-                        new_status = "CLOSED"
-                        new_color = "#FF0000"
-                    else:
-                        new_status = "OPEN"
-                        new_color = "#008000"
-
-                    self.status = new_status
-                    self.color = new_color
-
-                    if self.status != self.last_sent_status:
-                        self.trigger_api_update(self.status)
-                        self.last_sent_status = self.status
-
-                except Exception as e:
-                    print(f"Door Logic Error: {e}")
-                    self.status = "ERROR"
             
+            if not ret:
+                consecutive_failures += 1
+                if consecutive_failures >= 5:
+                    self.log(f"Door Cam: lost feed, reconnecting... (index {self.camera_index})")
+                    self.cap.release()
+                    self.cap = None
+                    self.status = "CAM ERROR"
+                    self.color = "#FFA500"
+                    time.sleep(1)
+                    self._init_camera()
+                    consecutive_failures = 0
+                time.sleep(0.2)
+                continue
+
+            consecutive_failures = 0  # reset on any successful read
+
+            try:
+                h, w, _ = frame.shape
+                if h < 350 or w < 800:
+                    self.log("Door Cam Warning: Resolution too low for hardcoded ROI.")
+                    time.sleep(1)
+                    continue
+
+                roi = frame[210:350, 260:800]
+                gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+                blurred_roi = cv2.GaussianBlur(gray_roi, (5, 5), 0)
+                edges = cv2.Canny(blurred_roi, 50, 150)
+                edge_pixel_count = cv2.countNonZero(edges)
+
+                threshold = int(self.config.get("threshold", 500))
+
+                if edge_pixel_count > threshold:
+                    new_status = "CLOSED"
+                    new_color = "#FF0000"
+                else:
+                    new_status = "OPEN"
+                    new_color = "#008000"
+
+                self.status = new_status
+                self.color = new_color
+
+                current_time = time.time()
+                if self.status != self.last_sent_status or (current_time - self.last_send_time > 3):
+                    self.trigger_api_update(self.status)
+                    self.last_sent_status = self.status
+                    self.last_send_time = current_time
+
+            except Exception as e:
+                print(f"Door Logic Error: {e}")
+                self.status = "ERROR"
+
             time.sleep(0.1)
+
 
     def trigger_api_update(self, status_to_send):
         def _send():
@@ -132,7 +155,6 @@ class DoorMonitorThread(threading.Thread):
                         json={"status": status_to_send},
                         timeout=3
                     )
-                    self.log(f"Door API: {status_to_send} (Code: {r2.status_code})")
             except Exception as e:
                 print(f"Door API Error: {e}")
         
@@ -145,7 +167,7 @@ class DoorMonitorThread(threading.Thread):
             self.cap = None
         
     def set_pause(self, val):
-        self.paused = val
+        self.paused = val          # ← THIS LINE WAS MISSING for val=False
         if val and self.cap:
             self.cap.release()
             self.cap = None
@@ -203,7 +225,8 @@ class DetectorThread(threading.Thread):
         initial_ball_count = 0
         time_tag = False
         start_time = None
-
+        verification_start_time = None
+        
         while not self.stop_event.is_set():
             ret, frame = cap.read()
             if not ret:

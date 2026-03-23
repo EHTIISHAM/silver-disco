@@ -6,8 +6,6 @@ import leadingicon from "../assets/Leading-icon.png";
 import contact from "../assets/contact.png";
 import gift from "../assets/gift.png";
 import entry from "../assets/entry.png";
-import cup from "../assets/cup.png";
-import calendar from "../assets/calendar.png";
 import b1 from "../assets/5balls/01.png";
 import b2 from "../assets/5balls/02.png";
 import b3 from "../assets/5balls/03.png";
@@ -269,7 +267,7 @@ useEffect(() => {
         <div className="bg-[#121212] rounded-2xl p-4 shadow border border-gray-800 flex flex-col justify-between">
   <div>
     <h2 className="text-sm text-white-600 mb-1">
-      Next race{" "}
+      Next Live race{" "}
       <span className="text-indigo-400">
         ({currentGameType ? currentGameType : "null"})
       </span>
@@ -354,7 +352,7 @@ useEffect(() => {
     onClick={() => setShowModal(true)}
     disabled={isGameUnavailable}
     >
-    {isGameUnavailable ? "No Race Available" : "Join next Race"}
+    {isGameUnavailable ? "No Race Available" : "Play next Live Race"}
     </button>
 </div>
 
@@ -452,13 +450,13 @@ useEffect(() => {
 
   <div className="relative z-10">
     <h2 className="text-sm font-semibold mb-1 text-white">
-      October speed championship
+      championships 
     </h2>
-    <p className="text-xs text-gray-400 mb-3">Sponsored by pinballrace.com</p>
+    <p className="text-xs text-gray-400 mb-3">Currently Unavailable</p>
 
-    {/* Info boxes */}
+    {/* Info boxes 
     <div className="grid grid-cols-2 gap-2 text-sm mb-4">
-      {/* 🗓 Left box (Days Left) */}
+      {/* 🗓 Left box (Days Left) 
       <div className="bg-white/5 backdrop-blur-md p-3 rounded-xl border border-white/10 flex flex-col items-start text-left">
         <div className="flex items-center justify-start space-x-2 mb-1">
           <img
@@ -470,8 +468,7 @@ useEffect(() => {
         </div>
         <span className="text-gray-400 text-xs ml-6">Left</span>
       </div>
-
-      {/* 👥 Participants */}
+      {/* 👥 Participants 
       <div className="bg-white/5 backdrop-blur-md p-3 rounded-xl border border-white/10 flex flex-col items-start text-left">
         <div className="flex items-center justify-start space-x-2 mb-1">
           <img
@@ -484,7 +481,7 @@ useEffect(() => {
         <span className="text-gray-400 text-xs ml-6">Participants</span>
       </div>
 
-      {/* 🏆 Gift card prize */}
+      {/* 🏆 Gift card prize 
       <div className="col-span-2 bg-white/5 backdrop-blur-md p-3 rounded-xl border border-white/10 flex flex-col items-start text-left">
         <div className="flex items-center justify-start space-x-2 mb-1">
           <img
@@ -496,7 +493,7 @@ useEffect(() => {
         </div>
         <span className="text-gray-400 text-xs ml-6">Gift card prize</span>
       </div>
-    </div>
+    </div>*/}
   </div>
 </div>
 

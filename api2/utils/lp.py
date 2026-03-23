@@ -37,6 +37,7 @@ landing_page_cache = {
     "is_live": False,
     "last_race_players": 0,
     "total_races": 0,
+    "max_offline_race":5,
     "sponsors": []
 }
 
@@ -107,7 +108,7 @@ async def get_admin_config():
 async def refresh_landing_data():
     """Background loop that updates the cache every 5 minutes (300 seconds)."""
     global landing_page_cache
-    
+    max_offline_race = str(os.getenv("MAX_OFFLINE_GAMES_PER_DAY",5))
     while True:
         try:
             # 1. Fetch live DB stats
@@ -124,6 +125,7 @@ async def refresh_landing_data():
                 "last_race_players": last_race_players,
                 "total_races": total_races,
                 "sponsors": admin_data.get("sponsors", []),
+                "max_offline_race": max_offline_race,
                 "last_updated": datetime.utcnow().isoformat()
             }
             
@@ -137,7 +139,7 @@ async def refresh_landing_data():
             print(f"Error refreshing landing data: {e}")
             
         # Wait 5 minutes before running again
-        await asyncio.sleep(300)
+        await asyncio.sleep(5)
 
 # --- STARTUP EVENT ---
 
