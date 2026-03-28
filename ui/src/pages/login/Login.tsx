@@ -27,22 +27,31 @@ const HomePage = () => {
   const [landingData, setLandingData] = useState<any>(null);
   const serverUrl: string | undefined = import.meta.env.VITE_SERVER_URL;
   const navigate = useNavigate();
-  const getHoursUntilRace = (timestamp: number | null) => {
+  const [timeUntilRace, setTimeUntilRace] = useState<string>("--:--:--");
+
+useEffect(() => {
+  const updateTimer = () => {
+    setTimeUntilRace(getCountdownToRace(landingData?.next_race_time ?? null));
+  };
+
+  updateTimer();
+  const interval = setInterval(updateTimer, 1000);
+  return () => clearInterval(interval);
+}, [landingData?.next_race_time]);
+
+const getCountdownToRace = (timestamp: number | null) => {
   if (!timestamp) return "TBD";
-  
-  const targetTimeMs = timestamp * 1000;
-  const currentTimeMs = Date.now();
-  
-  const diffMs = targetTimeMs - currentTimeMs;
-  
-  // If the race time has already passed
-  if (diffMs <= 0) return "0 hours"; 
-  
-  // Convert milliseconds to hours (using Math.ceil to round up to the nearest hour)
-  const hours = Math.ceil(diffMs / (1000 * 60 * 60)); 
-  
-  return `${hours} hour${hours !== 1 ? 's' : ''}`;
-}; 
+
+  const diffMs = timestamp * 1000 - Date.now();
+  if (diffMs <= 0) return "00:00:00";
+
+  const totalSeconds = Math.floor(diffMs / 1000);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+};
   // ✅ Check session
   useEffect(() => {
     if (!serverUrl) {
@@ -261,16 +270,14 @@ const HomePage = () => {
                 <span className="text-white font-semibold">We are Live</span> 
                 </>
             ) : (
-                <>
-                <span className="text-gray-400 font-semibold">Currently Offline</span> 
-                <span className="text-gray-500 mx-2">|</span> 
+              <>
+                <span className="text-gray-400 font-semibold">Currently Offline</span>
+                <span className="text-gray-500 mx-2">|</span>
                 <span>
-                Next Race starts in{" "}
-                <span className="text-purple-400 font-mono">
-                    {getHoursUntilRace(landingData?.next_race_time)}
+                  Next Race starts in{" "}
+                  <span className="text-purple-400 font-mono">{timeUntilRace}</span>
                 </span>
-            </span>
-                </>
+              </>
             )}
             </div>
 
