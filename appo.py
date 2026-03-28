@@ -227,12 +227,14 @@ class DetectorThread(threading.Thread):
             confs = results[0].boxes.conf.cpu().numpy() if results[0].boxes is not None else []
 
             annotated_frame = frame.copy()
+            labels = []
             for (x_c, y_c, bw, bh), c, conf in zip(boxes, cls, confs):
                 x1 = int(x_c - bw / 2)
                 y1 = int(y_c - bh / 2)
                 x2 = int(x_c + bw / 2)
                 y2 = int(y_c + bh / 2)
                 label = f"{names[c]} {conf:.2f}"
+                labels.append({x1:label})
                 cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 cv2.putText(annotated_frame, label, (x1, y1 - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
@@ -278,6 +280,7 @@ class DetectorThread(threading.Thread):
                 time_tag = False
             if len(ball_rankings) >= 10 or time_tag == True:
                 self.log(f"🏁 Ball Rankings ready: {ball_rankings}")
+                self.log(f"label_data: {sorted(labels, key=lambda x: list(x.keys())[0])}")
                 print(ball_rankings)
                 ball_rankings = self.sort_my_balls(detections=ball_detections)
                 cv2.imwrite("detected frame.jpg", annotated_frame)

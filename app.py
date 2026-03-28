@@ -7,9 +7,9 @@ import json
 import requests
 import torch
 import ultralytics
-import numpy as np
 import time
 import os
+from collections import Counter
 
 CONFIG_FILE = "config.json"
 
@@ -213,7 +213,7 @@ class DetectorThread(threading.Thread):
 
         try:
             cam_idx = int(self.config["camera_index"])
-            cap = cv2.VideoCapture(cam_idx)
+            cap = cv2.VideoCapture(cam_idx ,cv2.CAP_DSHOW)
         except ValueError:
             cap = cv2.VideoCapture(self.config["camera_index"])
 
@@ -225,14 +225,24 @@ class DetectorThread(threading.Thread):
         initial_ball_count = 0
         time_tag = False
         start_time = None
+
         verification_start_time = None
-        
+        verification_rankings_history = []
+
+        cooldown_until = 0
+        race_completed = False
+
         while not self.stop_event.is_set():
             ret, frame = cap.read()
             if not ret:
                 self.log("Camera frame not received.")
                 break
 
+            if time.time() < cooldown_until:
+                    cv2.imshow("Ball Detection", frame)
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        break
+                    continue
             h, w, _ = frame.shape
             start_x = max((w - new_w) // 2, 0)
             start_y = max((h - new_h) // 2, 0)
@@ -245,12 +255,14 @@ class DetectorThread(threading.Thread):
             confs = results[0].boxes.conf.cpu().numpy() if results[0].boxes is not None else []
 
             annotated_frame = frame.copy()
+            labels = []
             for (x_c, y_c, bw, bh), c, conf in zip(boxes, cls, confs):
                 x1 = int(x_c - bw / 2)
                 y1 = int(y_c - bh / 2)
                 x2 = int(x_c + bw / 2)
                 y2 = int(y_c + bh / 2)
                 label = f"{names[c]} {conf:.2f}"
+                labels.append({x1:label})
                 cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 cv2.putText(annotated_frame, label, (x1, y1 - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
@@ -263,76 +275,131 @@ class DetectorThread(threading.Thread):
             ball_rankings = rank_balls_left_to_right(ball_detections)
             current_count = len(ball_rankings)
 
-            # --- Inside your processing loop ---
+            if race_completed:
+                if current_count == 0:
+                    self.log("Funnel cleared. Ready for the next race.")
+                    race_completed = False # Unlock for the next race
+                else:
+                    # Funnel still has balls in it, skip tracking logic
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        break
+                    continue
 
-            # 1. Handle the 10-second "stale" timer (existing logic)
+
             if current_count > 0:
                 if current_count > initial_ball_count or start_time is None:
                     initial_ball_count = current_count
                     start_time = time.time()
                     time_tag = False 
                 elif current_count == initial_ball_count:
-                    elapsed = time.time() - start_time
-                    if elapsed > 10:
+                    if (time.time() - start_time) > 10:
                         time_tag = True
             else:
                 start_time = None
                 initial_ball_count = 0
                 time_tag = False
+                verification_start_time = None
+                verification_rankings_history.clear()
+            # --- Inside your processing loop ---
 
             # 2. NEW: 2-Second Verification Logic for "10 Balls Detected"
             # If 10 balls found and we haven't started the 2s timer yet, start it.
-            if (current_count >= 10 or time_tag) and verification_start_time is None:
-                self.log("Target reached. Waiting 2 seconds to stabilize data...")
-                verification_start_time = time.time()
+            # 2. VERIFICATION TRIGGER & ACCUMULATOR
+            if (current_count >= 10 or time_tag):
+                if verification_start_time is None:
+                    self.log("Target reached. Accumulating frames for 2 seconds...")
+                    verification_start_time = time.time()
+                    verification_history = [] 
 
-            # 3. Check if the 2-second wait is over
+                if ball_rankings:
+                    verification_history.append(ball_rankings)
+
+            # 3. RESOLVE VERIFICATION & SEND DATA
             if verification_start_time is not None:
-                if time.time() - verification_start_time >= 2:
-                    # This is the "New Data" capture point
-                    self.log(f"🏁 2s elapsed. Sending stabilized rankings: {ball_rankings}")
+                if time.time() - verification_start_time >= 2.0: 
                     
+                    if verification_history:
+                        ball_counts = {}
+                        ball_rank_sums = {}
+                        total_frames = len(verification_history)
+
+                        # Step 1: Tally up how many times each ball appeared, and sum their ranks
+                        for frame_dict in verification_history:
+                            for ball_id, rank in frame_dict.items():
+                                ball_counts[ball_id] = ball_counts.get(ball_id, 0) + 1
+                                ball_rank_sums[ball_id] = ball_rank_sums.get(ball_id, 0) + rank
+
+                        # Step 2: Filter ghosts and calculate average ranks
+                        valid_balls_avg_rank = {}
+                        for ball_id, count in ball_counts.items():
+                            # If the ball appeared in at least 30% of the frames, it's real
+                            if (count / total_frames) >= 0.30: 
+                                valid_balls_avg_rank[ball_id] = ball_rank_sums[ball_id] / count
+
+                        # Step 3: Sort the valid balls by their average historical rank
+                        # valid_balls_avg_rank looks like: {'ball_1': 1.0, 'ball_2': 2.3, 'ball_3': 2.8}
+                        sorted_balls = sorted(valid_balls_avg_rank.items(), key=lambda item: item[1])
+
+                        # Step 4: Rebuild the final clean dictionary with 1 to N rankings
+                        final_rankings = {}
+                        for new_rank, (ball_id, avg_rank) in enumerate(sorted_balls, start=1):
+                            final_rankings[ball_id] = new_rank
+
+                    else:
+                        final_rankings = ball_rankings # Fallback
+
+                    self.log(f"🏁 2s elapsed. Sending robust rankings ({len(final_rankings)} balls): {final_rankings}")
+                    self.log(f"label_data: {sorted(labels, key=lambda x: list(x.keys())[0])}")
                     cv2.imwrite("detected_frame.jpg", annotated_frame)
                     
-                    # Fire the API with the rankings detected *after* the 2s wait
-                    self.trigger_ranking_api(ball_rankings)
+                    self.trigger_ranking_api(final_rankings)
                     
-                    # Reset everything
+                    race_completed = True 
+                    
                     start_time = None
                     initial_ball_count = 0
                     time_tag = False
-                    verification_start_time = None # Reset our 2s timer
+                    verification_start_time = None
+                    verification_history.clear()
                     
-                    self.log("Cooling down for 3 seconds while funnel clears...")
-                    time.sleep(3)
+                    self.log("Cooling down for 3 seconds...")
+                    cooldown_until = time.time() + 3 
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-
         cap.release()
         cv2.destroyAllWindows()
         self.log("Detection stopped.")
-
     def trigger_ranking_api(self, ball_rankings):
         """ Handles the heavy API calls without freezing the OpenCV frame loop """
         def _send():
             try:
                 response = requests.get("https://admin.pinballrace.com/api/games/status", timeout=5)
-                if response.status_code == 200:
-                    current_game = response.json().get("currentGame", "N/A")
-                    if current_game != "N/A" and current_game["status"] == "Ongoing":
-                        self.log(f"Current Game: {current_game['gameNumber']} - {current_game['status']}")
-                        
-                        response2 = requests.post(
-                            self.config["api_url"], 
-                            json=ball_rankings,
-                            timeout=5
-                        )
-                        self.log(f"Sent to API Game {current_game['gameNumber']}: {response2.status_code}")
+                response.raise_for_status() # Catches 404s, 500s, etc.
+                
+                data = response.json()
+                current_game = data.get("currentGame")
+
+                # The FIX: Ensure current_game is actually a dictionary before accessing keys
+                if isinstance(current_game, dict) and current_game.get("status") == "Ongoing":
+                    game_number = current_game.get('gameNumber', 'Unknown')
+                    self.log(f"Current Game: {game_number} - Ongoing")
+                    
+                    response2 = requests.post(
+                        self.config["api_url"], 
+                        json=ball_rankings,
+                        timeout=5
+                    )
+                    response2.raise_for_status()
+                    
+                    self.log(f"Sent to API Game {game_number}: {response2.status_code}")
                 else:
-                    self.log(f"Failed to fetch game status: {response.status_code}")
+                    self.log("No ongoing game detected. Data not sent.")
+                    
+            except requests.exceptions.RequestException as e:
+                self.log(f"Ranking API Network Error: {e}")
             except Exception as e:
-                self.log(f"Ranking API Error: {e}")
+                self.log(f"Ranking API Processing Error: {e}")
                 
         threading.Thread(target=_send, daemon=True).start()
 
@@ -367,6 +434,8 @@ class DetectionApp:
         
         self.door_status_label = tk.Label(self.tab_main, text="Door Status: INITIALIZING", font=("Helvetica", 16, "bold"))
         self.door_status_label.pack(pady=10)
+
+        ttk.Button(self.tab_main, text="Reconnect Door Camera", command=self.reconnect_door_camera).pack(pady=5)
         
         self.log_box = scrolledtext.ScrolledText(self.tab_main, width=80, height=20, state="disabled")
         self.log_box.pack(padx=10, pady=10)
@@ -455,7 +524,20 @@ class DetectionApp:
         self.door_thread.set_pause(True)
         self.safe_log("Opening Door Preview...")
         threading.Thread(target=self._run_preview_loop).start()
-
+    
+    def reconnect_door_camera(self):
+        self.safe_log("Manual override: Restarting Door Camera thread...")
+        
+        # 1. Stop the existing frozen thread
+        if self.door_thread:
+            self.door_thread.stop()
+            
+        # 2. Re-initialize and start a fresh thread
+        self.door_thread = DoorMonitorThread(self.config, self.safe_log)
+        self.door_thread.start()
+        
+        self.door_status_label.config(text="Door Status: RECONNECTING...", fg="#FFA500")
+        self.safe_log("Door Camera thread restarted.")
     def _door_status(self, frame):
         roi = frame[210:350, 260:800] 
         gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
@@ -480,7 +562,7 @@ class DetectionApp:
     def _run_preview_loop(self):
         try:
             cam_idx = int(self.door_camera_entry.get())
-            cap = cv2.VideoCapture(cam_idx)
+            cap = cv2.VideoCapture(cam_idx, cv2.CAP_DSHOW)
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
             
