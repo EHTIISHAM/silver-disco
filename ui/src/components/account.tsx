@@ -310,7 +310,7 @@ const AccountScreen: React.FC = () => {
       )}
 
       {/* Notifications */}
-      {activeTab === "Notifications" && <NotificationSettings />}
+      {activeTab === "Notifications" && <NotificationSettings userId={userData._id} />}
 
       {/* Security */}
       {activeTab === "Security" && <SecuritySettings id={userData._id} />}

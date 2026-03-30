@@ -85,6 +85,13 @@ ZIP_PATH = f"{EXPORT_DIR}/database_export.zip"
 class UserEmail(BaseModel):
     email: str
 
+class NotificationSettingsUpdate(BaseModel):
+    userId: str # Keeping the name clear, even if the DB field is _id
+    raceReminders: bool
+    raceResults: bool
+    competitionUpdates: bool
+    weeklySummary: bool
+
 class UpdateOfflineGameRequest(BaseModel):
     game_id: str
     rankings: Dict[str, Any] # Accepts the dictionary structure
@@ -1368,6 +1375,57 @@ async def user_stats(user_email_data: UserEmail):
         "favoriteBalls": favorite_balls_list
     }
 
+@app.get("/api/user/notifications/{user_id}")
+async def get_notifications(user_id: str):
+    """Fetches user notification settings. Returns defaults if not set."""
+    try:
+        user = await db.users.find_one({"_id": ObjectId(user_id)})
+        if not user:
+            raise HTTPException(status_code=499, detail="User not found")
+
+        # Default settings if the user hasn't set them yet
+        defaults = {
+            "raceReminders": True,
+            "raceResults": True,
+            "competitionUpdates": True,
+            "weeklySummary": True
+        }
+        
+        # Return what's in the DB, or the defaults
+        return user.get("notifications", defaults)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/user/notifications")
+async def update_notifications(data: NotificationSettingsUpdate):
+    """Updates or creates the notification settings for a user."""
+    try:
+        user_id = ObjectId(data.userId)
+        user = await db.users.find_one({"_id": user_id})
+        
+        if not user:
+            raise HTTPException(status_code=499, detail="User not found")
+
+        new_settings = {
+            "raceReminders": data.raceReminders,
+            "raceResults": data.raceResults,
+            "competitionUpdates": data.competitionUpdates,
+            "weeklySummary": data.weeklySummary
+        }
+
+        # $set will create the "notifications" object if it doesn't exist
+        await db.users.update_one(
+            {"_id": user_id},
+            {"$set": {"notifications": new_settings}}
+        )
+
+        return {"message": "Notifications updated successfully", "notifications": new_settings}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 LEADERBOARD_CACHE = {
 "today": {"last_update": None, "data": []},
@@ -1771,21 +1829,47 @@ async def get_recent_races(username: Optional[str] = Query(None)):
             games_off_list = await off_cursor.to_list(length=4)  
         else:
             games_off_list = []
-        cursor = db.leaderboard.find(query_filter).sort("datePlayed", -1).limit(100)
-        recent_races = await cursor.to_list(length=4)
+        live_query_filter = {"participants.username": username} if username else {}
+        
+        # 2. Use $lookup to join 'games' with 'leaderboard' on gameNumber == raceId
+        pipeline = [
+            {"$match": live_query_filter},
+            {"$sort": {"createdAt": -1}},
+            {"$limit": 100},
+            {"$lookup": {
+                "from": "leaderboard",
+                "localField": "gameNumber",
+                "foreignField": "raceId",
+                "as": "leaderboard_data"
+            }}
+        ]
+        
+        live_cursor = db.games.aggregate(pipeline)
+        live_games_list = await live_cursor.to_list(length=100) # Increased length to match limit
         #TODO: apply loop to leaderboard and games_off_list
         # get _id (for offline is offline), username,top5Balls
         # get games_off id offline, username = participants.username, top5balls = participants.ball converted to int
-
         res_data = []
-        for race in recent_races:
-            data = {}
-            data["raceId"] = race["raceId"]
-            data["username"] = race["username"]
-            data["top5Balls"] = race["top5Balls"]
-            data["isOffline"] = False
-            data["position"] = "0"
-            data["createdAt"]= race["datePlayed"]
+        for game in live_games_list:
+            # Extract top5Balls from the joined leaderboard array (if it exists)
+            lb_data = game.get("leaderboard_data", [])
+            top5 = lb_data[0].get("top5Balls", []) if lb_data else []
+            
+            # Resolve username (if no specific username was queried, default to the first participant)
+            target_username = username
+            if not target_username and game.get("participants"):
+                target_username = game["participants"][0].get("username", "No Winner")
+            elif not target_username:
+                target_username = "No Winner"
+                
+            data = {
+                "raceId": game.get("gameNumber"),
+                "username": target_username,
+                "top5Balls": top5,
+                "isOffline": False,
+                "position": "0", # Keeping this as "0" to match your original structure
+                "createdAt": int(game.get("createdAt"))/1000
+            }
             res_data.append(data)
         for games in games_off_list:
             # only the number remove the "ball_"
@@ -1982,6 +2066,8 @@ async def download_database(
         media_type="application/zip", 
         filename="pinballrace_db_backup.zip"
     )
+
+
 
 # ---------- Startup: ensure counters exist ----------
 @app.on_event("startup")
