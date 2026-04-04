@@ -163,3 +163,14 @@ async def get_landing_data():
         raise HTTPException(status_code=503, detail="Cache warming up, please try again in a moment.")
     
     return landing_page_cache
+
+@router.get("/timer_data")
+async def get_landing_data():
+    """
+    Returns the cached landing page data in a single call.
+    No DB queries are executed here, making it incredibly fast.
+    """
+    if not landing_page_cache:
+        raise HTTPException(status_code=503, detail="Cache warming up, please try again in a moment.")
+    
+    return {"timer":landing_page_cache["next_race_time"]}

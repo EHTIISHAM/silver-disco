@@ -1,6 +1,6 @@
 // src/components/PinballRaceHeader.tsx
 import React, { useEffect, useState } from "react";
-import {IoNotificationsOutline } from "react-icons/io5";
+import { HiBars3 } from "react-icons/hi2";
 import logo from "../assets/orilogo.png";
 
 interface Props {
@@ -87,7 +87,7 @@ const PinballRaceHeader: React.FC<Props> = ({
           className="p-2 rounded-full border border-gray-600 hover:bg-gray-800 transition"
           aria-label="Notifications"
         >
-          <IoNotificationsOutline size={20} />
+          <HiBars3 size={20} />
         </button>
       </div>
     </header>

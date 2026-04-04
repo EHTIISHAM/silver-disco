@@ -48,6 +48,7 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 5
 CHUNK_SIZE = 1024 * 1024
 POS_POINT = { "1": 20, "2": 10, "3": 5, "4": 1, "5": 1 , "6": 1, "7": 1, "8": 1, "9": 1, "10": 1 ,"0":0}
+OFF_POS_POINT = { "1": 10, "2": 5, "3": 3, "4": 1, "5": 1 , "6": 1, "7": 1, "8": 1, "9": 1, "10": 1 ,"0":0}
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB in bytes
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 MAX_OFFLINE_GAMES_PER_DAY = os.getenv("MAX_OFFLINE_GAMES_PER_DAY",3)

@@ -113,9 +113,44 @@ const RaceDashboard: React.FC<RaceDashboardProps> = ({ username }) => {
   const currentEntry = games[0]?.entry || "free";
   const currentgift = games[0]?.prizeTitle || "Points Only";
   const isGameUnavailable = currentGameNumber === "----";
-  
+  const [timerData, setTimerData] = useState<number | null>(null);
+  const [countdown, setCountdown] = useState<string>("--:--:--");
   // TODO: make it so that we can filter out user own data too
   // ✅ Fetch data from backend LeaderboardTemp
+    useEffect(() => {
+    const fetchTimerData = async () => {
+        try {
+        const res = await fetch(`${import.meta.env.VITE_PY_SERVER_URL}/timer_data`);
+        const data = await res.json();
+        setTimerData(data.timer);
+        } catch (err) {
+        console.error("Failed to fetch timer data", err);
+        }
+    };
+    fetchTimerData();
+    }, []);
+
+    useEffect(() => {
+    if (currentGameType !== "----" || timerData === null) return;
+
+    const interval = setInterval(() => {
+        const now = Math.floor(Date.now() / 1000);
+        const diff = timerData - now;
+
+        if (diff <= 0) {
+        setCountdown("00:00:00");
+        clearInterval(interval);
+        return;
+        }
+
+        const h = Math.floor(diff / 3600).toString().padStart(2, "0");
+        const m = Math.floor((diff % 3600) / 60).toString().padStart(2, "0");
+        const s = (diff % 60).toString().padStart(2, "0");
+        setCountdown(`${h}:${m}:${s}`);
+    }, 1000);
+
+    return () => clearInterval(interval);
+    }, [timerData, currentGameType]);
   useEffect(() => {
   const fetchRecentRaces = async () => {
     try {
@@ -269,7 +304,7 @@ useEffect(() => {
     <h2 className="text-sm text-white-600 mb-1">
       Next Live race{" "}
       <span className="text-indigo-400">
-        ({currentGameType ? currentGameType : "null"})
+        {currentGameType === "----" ? countdown : `(${currentGameType})`}
       </span>
     </h2>
     <p className="text-gray-300 text-sm mb-3">
