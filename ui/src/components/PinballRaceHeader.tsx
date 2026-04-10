@@ -2,30 +2,32 @@
 import React, { useEffect, useState } from "react";
 import { HiBars3 } from "react-icons/hi2";
 import logo from "../assets/orilogo.png";
+import HowToPlay from "../components/howtoplay";
+import HowPointsWork from "../components/howpointsworks";
+import SponsorPage from "../components/sponcerpage";
 
 interface Props {
   pfp?: string | null;
   username?: string | null;
   onSearchClick?: () => void;
-  onNotificationsClick?: () => void;
+  sidebarsection?: () => void;
 }
+
+type ActivePage = "how-to-play" | "how-points-work" | "sponsor" | null;
 
 const PinballRaceHeader: React.FC<Props> = ({
   pfp,
   username,
-  
-  onNotificationsClick,
+  sidebarsection,
 }) => {
   const [userPfp, setUserPfp] = useState<string | undefined>(pfp ?? undefined);
-  // const [userName, setUserName] = useState<string | undefined>(username ?? undefined);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activePage, setActivePage] = useState<ActivePage>(null);
   const fallbackPfp = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
-  // Fetch user info if props not provided
   useEffect(() => {
-    // ✅ If parent provided pfp or username, use them directly
     if (pfp) {
       setUserPfp(pfp ?? undefined);
-      // setUserName(username ?? undefined);
       return;
     }
 
@@ -41,61 +43,159 @@ const PinballRaceHeader: React.FC<Props> = ({
         const res = await fetch(`${serverUrl}/get_profile`, {
           credentials: "include",
         });
-
-        if (!res.ok) {
-          console.warn("Failed to fetch profile:", res.status);
-          return;
-        }
-
+        if (!res.ok) return;
         const data = await res.json();
         const userData = data.user || data;
-
         if (mounted) {
           setUserPfp(userData.pfp ?? userData.profilePic ?? undefined);
-          // setUserName(userData.username ?? undefined);
         }
       } catch (err) {
         console.error("Error fetching profile:", err);
       }
     })();
 
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, [pfp, username]);
 
+  const handleSidebarToggle = () => {
+    setSidebarOpen((prev) => !prev);
+    sidebarsection?.();
+  };
+
+  const openPage = (page: ActivePage) => {
+    setActivePage(page);
+    setSidebarOpen(false);
+  };
+
+  const navItems: { label: string; page: ActivePage }[] = [
+    { label: "How to Play",      page: "how-to-play" },
+    { label: "How Points Work",  page: "how-points-work" },
+    { label: "Sponsor the Race", page: "sponsor" },
+  ];
+
+  const renderActivePage = () => {
+    switch (activePage) {
+      case "how-to-play":     return <HowToPlay />;
+      case "how-points-work": return <HowPointsWork />;
+      case "sponsor":         return <SponsorPage />;
+      default:                return null;
+    }
+  };
+
   return (
-    <header className="flex items-center justify-between px-4 py-2 bg-[#121212] text-white shadow-md h-16 w-full">
-      <div className="flex items-center">
-        <img
-          src={userPfp || fallbackPfp}
-          // alt={userName || "User"}
-          className="w-10 h-10 rounded-full object-cover border-2 border-gray-700"
+    <>
+      <header className="flex items-center justify-between px-4 py-2 bg-[#121212] text-white shadow-md h-16 w-full">
+        <div className="flex items-center">
+          <img
+            src={userPfp || fallbackPfp}
+            className="w-10 h-10 rounded-full object-cover border-2 border-gray-700"
+          />
+        </div>
+
+        <div className="flex justify-center items-center">
+          <img src={logo} alt="Pinball Race Logo" className="h-20 object-contain select-none" />
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={handleSidebarToggle}
+            className="p-2 rounded-full border border-gray-600 hover:bg-gray-800 transition"
+            aria-label="Sidebar"
+          >
+            <HiBars3 size={20} />
+          </button>
+        </div>
+      </header>
+
+      {/* Sidebar backdrop */}
+      {sidebarOpen && (
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 40 }}
+          onClick={() => setSidebarOpen(false)}
         />
-        {/* {userName && <span className="ml-2 text-sm font-medium">{userName}</span>} */}
+      )}
+
+      {/* Slide-in sidebar */}
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          right: sidebarOpen ? 0 : "-220px",
+          width: "200px",
+          height: "100vh",
+          background: "#121212",
+          borderLeft: "1px solid #2a2a2a",
+          zIndex: 50,
+          transition: "right 0.25s ease",
+          display: "flex",
+          flexDirection: "column",
+          paddingTop: "72px",
+          paddingLeft: "24px",
+          paddingRight: "24px",
+          fontFamily: "Arial, Inter, sans-serif",
+        }}
+      >
+        {navItems.map((item) => (
+          <button
+            key={item.page}
+            onClick={() => openPage(item.page)}
+            style={{
+              background: "none",
+              border: "none",
+              borderBottom: "1px solid #2a2a2a",
+              color: "#f0f0f0",
+              fontSize: "15px",
+              textAlign: "left",
+              padding: "14px 0",
+              cursor: "pointer",
+              fontFamily: "Arial, Inter, sans-serif",
+            }}
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
 
-      <div className="flex justify-center items-center">
-        <img src={logo} alt="Pinball Race Logo" className="h-20 object-contain select-none" />
-      </div>
-
-      <div className="flex items-center space-x-2">
-        
-
-        <button
-          onClick={onNotificationsClick}
-          className="p-2 rounded-full border border-gray-600 hover:bg-gray-800 transition"
-          aria-label="Notifications"
+      {/* Full-screen overlay */}
+      {activePage && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 100,
+            background: "#000000",
+            overflowY: "auto",
+          }}
         >
-          <HiBars3 size={20} />
-        </button>
-      </div>
-    </header>
+          {/* Sticky back bar */}
+          <button
+            onClick={() => setActivePage(null)}
+            style={{
+              position: "sticky",
+              top: 0,
+              zIndex: 101,
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              background: "#121212",
+              border: "none",
+              borderBottom: "1px solid #2a2a2a",
+              color: "#f0f0f0",
+              fontSize: "14px",
+              padding: "12px 20px",
+              cursor: "pointer",
+              width: "100%",
+              fontFamily: "Arial, Inter, sans-serif",
+            }}
+          >
+            ← Back
+          </button>
+
+          {renderActivePage()}
+        </div>
+      )}
+    </>
   );
 };
 
 export default PinballRaceHeader;
-
-
-
-
