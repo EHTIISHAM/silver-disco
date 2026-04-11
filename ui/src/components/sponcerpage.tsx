@@ -295,7 +295,7 @@ export default function SponsorPage() {
           <p className="sp-cta-desc">
             Get our sponsorship opportunities, audience insights, and activation ideas — sent directly to you.
           </p>
-          <a href="mailto:sponsor@pinballrace.com" className="sp-cta-btn">Apply Now</a>
+          <a href="https://docs.google.com/forms/d/e/1FAIpQLSel4Rrfj9uqxpgoYaiIBUcxswgbXwAiDJAY2mR9M_6wkHD9Aw/viewform" className="sp-cta-btn">Apply Now</a>
         </div>
       </div>
     </div>

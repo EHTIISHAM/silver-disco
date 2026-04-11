@@ -250,7 +250,7 @@ export default function HowPointsWork() {
       {/* Tip box */}
       <div className="pts-hint">
         <div className="pts-hint-box">
-          🔴 Live races give the biggest points and are the fastest way to climb. ▶️ On-demand races let you earn extra points every day, even outside live hours. Use all 3 daily on-demand races and join the weekday lunch live to maximise your score.
+          🔴 Live races give the biggest points and are the fastest way to climb. <br />▶️ On-demand races let you earn extra points every day, even outside live hours. Use all 5 daily on-demand races and join the weekday lunch live to maximise your score.
         </div>
       </div>
 

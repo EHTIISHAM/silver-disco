@@ -4,18 +4,22 @@ import axios from "axios";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { MdClose, MdMenu } from "react-icons/md";
+import { HiBars3, HiXMark } from "react-icons/hi2";
+import { MdClose } from "react-icons/md";
 import { FaGoogle, FaTwitch } from "react-icons/fa";
 import { SiTiktok } from "react-icons/si";
 import logo from "../../assets/orilogo.png";
 import demo from "../../assets/demo.mp4";
 import Footer from "../../components/Footer";
+import HowToPlay from "../../components/howtoplay";
+import HowPointsWork from "../../components/howpointsworks";
+import SponsorPage from "../../components/sponcerpage";
 
 type Mode = "login" | "signup" | null;
 
 const HomePage = () => {
-  const [menuOpened, setMenuOpened] = useState(false);
-  const [authMode, setAuthMode] = useState<Mode>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activePage, setActivePage] = useState<"how-to-play" | "how-points-work" | "sponsor" | null>(null);  const [authMode, setAuthMode] = useState<Mode>(null);
   const [checking, setChecking] = useState(true);
 
   const [username, setUsername] = useState("");
@@ -144,70 +148,162 @@ const getCountdownToRace = (timestamp: number | null) => {
   return (
     <div className="relative min-h-screen flex flex-col bg-black text-white overflow-hidden">
       <header className="relative flex items-center justify-between px-5 py-4 bg-black border-b border-gray-800">
-          <img src={logo} alt="Logo" className="h-10 w-auto" />
-
-          {/* ✨ Center design element */}
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-            <div className="w-32 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-full shadow-lg" />
-          </div>
-
-          <button className="md:hidden" onClick={() => setMenuOpened(!menuOpened)}>
-            {!menuOpened ? <MdMenu size={28} /> : <MdClose size={28} />}
-          </button>
-
-          <div className="hidden md:flex gap-4">
-            <button
-              className="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg text-sm font-semibold"
-              onClick={() => setAuthMode("login")}
-            >
-              Login
-            </button>
-            <button
-              className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-sm font-semibold"
-              onClick={() => setAuthMode("signup")}
-            >
-              Sign Up
-            </button>
-          </div>
-        </header>
-
-
-      {/* MOBILE MENU */}
-      <AnimatePresence>
-        {menuOpened && (
-          <motion.div
-            className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center gap-6 z-50"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+        <img src={logo} alt="Logo" className="h-10 w-auto" />
+ 
+        {/* Center design element */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          <div className="w-32 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-full shadow-lg" />
+        </div>
+ 
+        {/* Hamburger — right side, all screen sizes */}
+        <button
+          onClick={() => setSidebarOpen(true)}
+          style={{
+            width: "40px",
+            height: "40px",
+            borderRadius: "50%",
+            border: "1px solid #444",
+            background: "transparent",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            flexShrink: 0,
+          }}
+        >
+          <HiBars3 size={20} color="#fff" />
+        </button>
+      </header>
+ 
+      {/* Sidebar backdrop */}
+      {sidebarOpen && (
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 40 }}
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+ 
+      {/* Slide-in sidebar */}
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          right: sidebarOpen ? 0 : "-260px",
+          width: "240px",
+          height: "100vh",
+          background: "#121212",
+          borderLeft: "1px solid #2a2a2a",
+          zIndex: 50,
+          transition: "right 0.25s ease",
+          display: "flex",
+          flexDirection: "column",
+          paddingTop: "64px",
+          fontFamily: "Arial, Inter, sans-serif",
+          overflowY: "auto",
+        }}
+      >
+        {/* Close button */}
+        <button
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: "absolute",
+            top: "16px",
+            right: "16px",
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            color: "#fff",
+          }}
+        >
+          <HiXMark size={22} />
+        </button>
+ 
+        {/* Login / Signup */}
+        <div style={{ padding: "0 20px 16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+          <button
+            className="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg text-sm font-semibold text-white"
+            onClick={() => { setAuthMode("login"); setSidebarOpen(false); }}
           >
-            <MdClose
-              className="absolute top-5 right-5 text-gray-300 cursor-pointer"
-              size={30}
-              onClick={() => setMenuOpened(false)}
-            />
-            <button
-              className="w-40 py-3 bg-indigo-600 rounded-xl hover:bg-indigo-700 transition"
-              onClick={() => {
-                setAuthMode("login");
-                setMenuOpened(false);
-              }}
-            >
-              Login
-            </button>
-            <button
-              className="w-40 py-3 bg-purple-600 rounded-xl hover:bg-purple-700 transition"
-              onClick={() => {
-                setAuthMode("signup");
-                setMenuOpened(false);
-              }}
-            >
-              Sign Up
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
+            Login
+          </button>
+          <button
+            className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-sm font-semibold text-white"
+            onClick={() => { setAuthMode("signup"); setSidebarOpen(false); }}
+          >
+            Sign Up
+          </button>
+        </div>
+ 
+        <div style={{ height: "1px", background: "#2a2a2a", margin: "0 20px 8px" }} />
+ 
+        {/* 3 page links */}
+        {(
+          [
+            { label: "How to Play",      page: "how-to-play" },
+            { label: "How Points Work",  page: "how-points-work" },
+            { label: "Sponsor the Race", page: "sponsor" },
+          ] as { label: string; page: "how-to-play" | "how-points-work" | "sponsor" }[]
+        ).map((item) => (
+          <button
+            key={item.page}
+            onClick={() => { setActivePage(item.page); setSidebarOpen(false); }}
+            style={{
+              background: "none",
+              border: "none",
+              borderBottom: "1px solid #2a2a2a",
+              color: "#f0f0f0",
+              fontSize: "15px",
+              textAlign: "left",
+              padding: "14px 20px",
+              cursor: "pointer",
+              fontFamily: "Arial, Inter, sans-serif",
+            }}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+ 
+      {/* Full-screen overlay for info pages */}
+      {activePage && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 100,
+            background: "#000000",
+            overflowY: "auto",
+          }}
+        >
+          <button
+            onClick={() => setActivePage(null)}
+            style={{
+              position: "sticky",
+              top: 0,
+              zIndex: 101,
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              background: "#121212",
+              border: "none",
+              borderBottom: "1px solid #2a2a2a",
+              color: "#f0f0f0",
+              fontSize: "14px",
+              padding: "12px 20px",
+              cursor: "pointer",
+              width: "100%",
+              fontFamily: "Arial, Inter, sans-serif",
+            }}
+          >
+            ← Back
+          </button>
+ 
+          {activePage === "how-to-play"     && <HowToPlay />}
+          {activePage === "how-points-work" && <HowPointsWork />}
+          {activePage === "sponsor"         && <SponsorPage />}
+        </div>
+      )}
+ 
 {/* ===== HERO SECTION (With Video Background Placeholder) ===== */}
       <main className="relative flex flex-col items-center justify-center flex-grow text-center px-6 py-24 overflow-hidden">
         {/* Background Video Placeholder */}

@@ -242,7 +242,7 @@ export default function HowToPlay() {
         <div className="htp-eyebrow">Game Guide</div>
         <h1 className="htp-title">How Pinball Race Works</h1>
         <p className="htp-subtitle">
-          Free daily marble races on a real physical track. Play live at scheduled times and enter 3 on-demand races per day to climb the leaderboard.
+          Free daily marble races on a real physical track. Play live at scheduled times and enter 5 on-demand races per day to climb the leaderboard.
         </p>
         <div className="htp-divider" />
       </div>
@@ -287,7 +287,7 @@ export default function HowToPlay() {
           </div>
           <div className="htp-step-body">
             <div className="htp-step-title">Earn Points &amp; Climb</div>
-            <p className="htp-step-desc">Points from every race count toward your global rank, weekly championships, and prize eligibility. Use all 3 daily on-demand races to maximise your score.</p>
+            <p className="htp-step-desc">Points from every race count toward your global rank, weekly championships, and prize eligibility. Use all 5 daily on-demand races to maximise your score.</p>
           </div>
         </div>
 
@@ -315,7 +315,7 @@ export default function HowToPlay() {
             <div className="htp-mode-name">On-Demand</div>
           </div>
           <ul className="htp-mode-list">
-            <li><span className="dot">▸</span> 3 per day</li>
+            <li><span className="dot">▸</span> 5 per day</li>
             <li><span className="dot">▸</span> Real footage from previous races</li>
             <li><span className="dot">▸</span> Random race assignment</li>
             <li><span className="dot">▸</span> No repeat races</li>
