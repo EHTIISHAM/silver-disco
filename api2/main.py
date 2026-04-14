@@ -1882,7 +1882,7 @@ async def get_recent_races(username: Optional[str] = Query(None)):
                 rank = adjust_rank(parts["rank"])
                 if parts["username"] == username:
                     data = {}
-                    data["raceId"] = "Offline"
+                    data["raceId"] = "On-Demand"
                     data["username"] = parts["username"]
                     data["top5Balls"] = winning_balls
                     data["position"] = rank

@@ -1,3 +1,6 @@
+import offlin1 from '../../public/offline.png';
+import online1 from '../../public/online.png';
+
 export default function HowToPlay() {
   return (
     <div style={{
@@ -323,6 +326,27 @@ export default function HowToPlay() {
           </ul>
         </div>
       </div>
+
+        {/* SECTION LABEL */}
+        <div className="htp-section-label">How to Play</div>
+
+        {/* ── LIVE RACE ── */}
+        <div style={{ maxWidth: 680, margin: '0 auto 16px', padding: '0 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="htp-mode-badge live" />
+        <span style={{ fontFamily: "'Inter',Arial,sans-serif", fontSize: 20, fontWeight: 700, color: '#fff' }}>Live Race</span>
+        </div>
+        <div style={{ maxWidth: 680, margin: '0 auto 48px', padding: '0 20px' }}>
+        <img src={online1} alt="Live race guide" style={{ width: '100%', borderRadius: 10, display: 'block' }} />
+        </div>
+
+        {/* ── ON-DEMAND ── */}
+        <div style={{ maxWidth: 680, margin: '0 auto 16px', padding: '0 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="htp-mode-badge demand" />
+        <span style={{ fontFamily: "'Inter',Arial,sans-serif", fontSize: 20, fontWeight: 700, color: '#fff' }}>On-Demand Races</span>
+        </div>
+        <div style={{ maxWidth: 680, margin: '0 auto 48px', padding: '0 20px' }}>
+        <img src={offlin1} alt="On-Demand race guide" style={{ width: '100%', borderRadius: 10, display: 'block' }} />
+        </div>
     </div>
   );
 }
