@@ -12,6 +12,9 @@ import uuid
 import base64
 import re
 import asyncio
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 
@@ -835,7 +838,7 @@ async def login(request: Request, response: Response, username: str = Form(...),
             if env_hash:
                 pwok = verify_password(password, env_hash)
             else:
-                pwok = password 
+                pwok = (password == env_pass)
             if pwok:
                 # create persistent admin doc
                 password_hash = env_hash if env_hash else hash_password(password)
@@ -1125,6 +1128,115 @@ async def past_winners_page(request: Request):
         "pastWinners": past_winners,
     }
     return templates.TemplateResponse("past_winners.html", context)
+
+
+@app.get("/email-all", response_class=HTMLResponse)
+async def email_all_page(request: Request):
+    try:
+        username = await require_login(request)
+    except HTTPException:
+        return RedirectResponse("/login")
+    users = await db.users.find({"email": {"$exists": True, "$ne": ""}}, {"_id": 0, "username": 1, "email": 1}).to_list(length=5000)
+    return templates.TemplateResponse("email_all.html", {
+        "request": request,
+        "username": username,
+        "users": users,
+        "total_users": len(users),
+        "success": None,
+        "error": None,
+        "sent_count": 0,
+    })
+
+
+@app.post("/api/email/send-all")
+async def api_email_send_all(request: Request, subject: str = Form(...), body: str = Form(...)):
+    username = await require_login(request)
+
+    users = await db.users.find(
+        {"email": {"$exists": True, "$ne": ""}},
+        {"_id": 0, "username": 1, "email": 1}
+    ).to_list(length=5000)
+    emails = [u["email"] for u in users if u.get("email")]
+
+    SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
+    SMTP_USER = os.getenv("SMTP_USER")
+    SMTP_PASS = os.getenv("SMTP_PASS")
+
+    error, sent = None, 0
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as smtp:
+            smtp.starttls()
+            smtp.login(SMTP_USER, SMTP_PASS)
+            for email in emails:
+                msg = MIMEMultipart()
+                msg["From"] = SMTP_USER
+                msg["To"] = email
+                msg["Subject"] = subject
+                msg.attach(MIMEText(body, "plain"))
+                smtp.sendmail(SMTP_USER, email, msg.as_string())
+                sent += 1
+    except Exception as e:
+        error = str(e)
+
+    return templates.TemplateResponse("email_all.html", {
+        "request": request, "username": username,
+        "users": users, "total_users": len(users),
+        "success": sent > 0 and not error,
+        "error": error, "sent_count": sent,
+    })
+
+
+@app.get("/analytics", response_class=HTMLResponse)
+async def analytics_page(request: Request, period: str = "all"):
+    try:
+        username = await require_login(request)
+    except HTTPException:
+        return RedirectResponse("/login")
+
+    now = datetime.now(timezone.utc)
+    period_deltas = {"1d": timedelta(days=1), "1w": timedelta(weeks=1), "1m": timedelta(days=30), "1y": timedelta(days=365)}
+    cutoff = now - period_deltas[period] if period in period_deltas else None
+    cutoff_ms = int(cutoff.timestamp() * 1000) if cutoff else None
+
+    signup_filter = {"createdAt": {"$gte": cutoff_ms}} if cutoff_ms else {}
+    game_filter   = {"createdAt": {"$gte": cutoff_ms}} if cutoff_ms else {}
+
+    period_signups       = await db.users.count_documents(signup_filter)
+    period_live_games    = await db.games.count_documents(game_filter)
+    period_nonlive_games = await db.games_off.count_documents(game_filter)
+
+    total_users         = await db.users.count_documents({})
+    total_live_games    = await db.games.count_documents({})
+    total_nonlive_games = await db.games_off.count_documents({})
+    total_winners       = await db.games.count_documents({"winners": {"$exists": True, "$not": {"$size": 0}}})
+
+    live_players    = await db.users.count_documents({"racesPlayed": {"$elemMatch": {"raceId": {"$ne": "offline"}}}})
+    nonlive_players = await db.users.count_documents({"racesPlayed": {"$elemMatch": {"raceId": "offline"}}})
+    both_players    = await db.users.count_documents({"$and": [
+        {"racesPlayed": {"$elemMatch": {"raceId": {"$ne": "offline"}}}},
+        {"racesPlayed": {"$elemMatch": {"raceId": "offline"}}}
+    ]})
+    never_played = await db.users.count_documents({"$or": [
+        {"racesPlayed": {"$exists": False}},
+        {"racesPlayed": {"$size": 0}}
+    ]})
+
+    return templates.TemplateResponse("analytics.html", {
+        "request": request, "username": username, "period": period,
+        "period_signups": period_signups,
+        "period_live_games": period_live_games,
+        "period_nonlive_games": period_nonlive_games,
+        "total_users": total_users,
+        "live_players": live_players,
+        "nonlive_players": nonlive_players,
+        "both_players": both_players,
+        "never_played": never_played,
+        "total_live_games": total_live_games,
+        "total_nonlive_games": total_nonlive_games,
+        "total_winners": total_winners,
+    })
+
 
 # ---------- API endpoints to mirror your React functions ----------
 @app.post("/api/games/new")

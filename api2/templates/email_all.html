@@ -1,0 +1,115 @@
+<!-- templates/email_all.html -->
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Email All Users - Admin Dashboard</title>
+  <link rel="stylesheet" href="/static/css/styles.css" />
+</head>
+<body>
+  <header>
+    <span class="welcome-text">Welcome, {{ username }}</span>
+    <div class="header-nav">
+      <a href="/dashboard" class="nav-link">Dashboard</a>
+      <a href="/past-winners" class="nav-link">Past Winners</a>
+      <a href="/nonlivegames" class="nav-link">Non Live Games</a>
+      <a href="/landing-settings" class="nav-link">Landing Settings</a>
+      <a href="/email-all" class="nav-link active">Email All</a>
+      <a href="/analytics" class="nav-link">Analytics</a>
+    </div>
+    <div class="header-right">
+      <a href="/logout" class="logout-btn">Logout</a>
+    </div>
+  </header>
+
+  <main class="content-container">
+    <h1>Email All Users</h1>
+
+    <div class="content-rows">
+
+      <!-- Compose Form -->
+      <section>
+        <div class="card admin-card">
+          <h3>Compose Email</h3>
+          <form method="post" action="/api/email/send-all">
+            <div class="form-group">
+              <label for="subject">Subject</label>
+              <input
+                type="text"
+                id="subject"
+                name="subject"
+                placeholder="Enter email subject..."
+                required
+                style="width:100%; padding:0.5rem; margin-top:0.25rem; box-sizing:border-box;"
+              />
+            </div>
+
+            <div class="form-group" style="margin-top:1rem;">
+              <label for="body">Message</label>
+              <textarea
+                id="body"
+                name="body"
+                rows="8"
+                placeholder="Enter your message here..."
+                required
+                style="width:100%; padding:0.5rem; margin-top:0.25rem; box-sizing:border-box; resize:vertical;"
+              ></textarea>
+            </div>
+
+            <div style="margin-top:1rem; display:flex; align-items:center; gap:1rem;">
+              <button type="submit" class="create-btn"
+                onclick="return confirm('Send this email to all {{ total_users }} users?');">
+                Send to All Users
+              </button>
+              <span style="color:#6b7280; font-size:0.875rem;">
+                {{ total_users }} recipient{{ 's' if total_users != 1 else '' }}
+              </span>
+            </div>
+
+            {% if success %}
+              <p style="color:#16a34a; margin-top:0.75rem;">Email sent successfully to {{ sent_count }} users.</p>
+            {% endif %}
+            {% if error %}
+              <p style="color:#dc2626; margin-top:0.75rem;">Error: {{ error }}</p>
+            {% endif %}
+          </form>
+        </div>
+      </section>
+
+      <!-- Recipient List -->
+      <section style="margin-top:1.5rem;">
+        <div class="card">
+          <h3 style="margin-bottom:0.75rem;">Recipients ({{ total_users }})</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Username</th>
+                <th>Email</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% if users %}
+                {% for u in users %}
+                  <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ u.username if u.username else '—' }}</td>
+                    <td>{{ u.email }}</td>
+                  </tr>
+                {% endfor %}
+              {% else %}
+                <tr>
+                  <td colspan="3" style="text-align:center; color:#6b7280; padding:2rem;">
+                    No users with email addresses found
+                  </td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</body>
+</html>

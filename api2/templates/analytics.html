@@ -1,0 +1,133 @@
+<!-- templates/analytics.html -->
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Analytics - Admin Dashboard</title>
+  <link rel="stylesheet" href="/static/css/styles.css" />
+  <style>
+    .period-bar { display:flex; gap:0.5rem; margin-bottom:1.5rem; }
+    .period-btn {
+      padding:0.4rem 1rem; border-radius:6px; font-size:0.85rem; font-weight:600;
+      text-decoration:none; color:#374151; background:#f3f4f6; border:1px solid #d1d5db;
+    }
+    .period-btn.active { background:#111827; color:#fff; border-color:#111827; }
+    .stat-cards { display:flex; gap:1rem; margin-bottom:2rem; flex-wrap:wrap; }
+    .stat-card {
+      flex:1; min-width:160px; text-align:center; padding:1.5rem;
+      background:#fff; border-radius:8px; border:1px solid #e5e7eb;
+      box-shadow:0 1px 3px rgba(0,0,0,.07);
+    }
+    .stat-label { font-size:0.75rem; text-transform:uppercase; letter-spacing:.05em; color:#6b7280; margin-bottom:.5rem; }
+    .stat-value { font-size:2.5rem; font-weight:700; }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="welcome-text">Welcome, {{ username }}</span>
+    <div class="header-nav">
+      <a href="/dashboard" class="nav-link">Dashboard</a>
+      <a href="/past-winners" class="nav-link">Past Winners</a>
+      <a href="/nonlivegames" class="nav-link">Non Live Games</a>
+      <a href="/landing-settings" class="nav-link">Landing Settings</a>
+      <a href="/email-all" class="nav-link">Email All</a>
+      <a href="/analytics" class="nav-link active">Analytics</a>
+    </div>
+    <div class="header-right">
+      <a href="/logout" class="logout-btn">Logout</a>
+    </div>
+  </header>
+
+  <main class="content-container">
+    <h1>Analytics</h1>
+
+    <!-- Period Filter -->
+    <div class="period-bar">
+      <a href="/analytics?period=1d"   class="period-btn {% if period == '1d'  %}active{% endif %}">1 Day</a>
+      <a href="/analytics?period=1w"   class="period-btn {% if period == '1w'  %}active{% endif %}">1 Week</a>
+      <a href="/analytics?period=1m"   class="period-btn {% if period == '1m'  %}active{% endif %}">1 Month</a>
+      <a href="/analytics?period=1y"   class="period-btn {% if period == '1y'  %}active{% endif %}">1 Year</a>
+      <a href="/analytics?period=all"  class="period-btn {% if period == 'all' %}active{% endif %}">All Time</a>
+    </div>
+
+    <!-- Period Stats: Signups / Live Games / Non-Live Games -->
+    <div class="stat-cards">
+      <div class="stat-card">
+        <div class="stat-label">Signups</div>
+        <div class="stat-value" style="color:#111827;">{{ period_signups }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Live Games</div>
+        <div class="stat-value" style="color:#2563eb;">{{ period_live_games }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Non-Live Games</div>
+        <div class="stat-value" style="color:#7c3aed;">{{ period_nonlive_games }}</div>
+      </div>
+    </div>
+
+    <div class="content-rows">
+
+      <!-- All-time Player Participation -->
+      <section>
+        <div class="card">
+          <h3 style="margin-bottom:0.75rem;">Player Participation (All Time)</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Count</th>
+                <th>% of Signups</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Played at least one live game</td>
+                <td>{{ live_players }}</td>
+                <td>{% if total_users > 0 %}{{ "%.1f"|format(live_players / total_users * 100) }}%{% else %}—{% endif %}</td>
+              </tr>
+              <tr>
+                <td>Played at least one non-live game</td>
+                <td>{{ nonlive_players }}</td>
+                <td>{% if total_users > 0 %}{{ "%.1f"|format(nonlive_players / total_users * 100) }}%{% else %}—{% endif %}</td>
+              </tr>
+              <tr>
+                <td>Played both live and non-live</td>
+                <td>{{ both_players }}</td>
+                <td>{% if total_users > 0 %}{{ "%.1f"|format(both_players / total_users * 100) }}%{% else %}—{% endif %}</td>
+              </tr>
+              <tr>
+                <td>Never played any game</td>
+                <td>{{ never_played }}</td>
+                <td>{% if total_users > 0 %}{{ "%.1f"|format(never_played / total_users * 100) }}%{% else %}—{% endif %}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Games Summary -->
+      <section style="margin-top:1.5rem;">
+        <div class="card">
+          <h3 style="margin-bottom:0.75rem;">Games Summary (All Time)</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Metric</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Total signups</td><td>{{ total_users }}</td></tr>
+              <tr><td>Total live games run</td><td>{{ total_live_games }}</td></tr>
+              <tr><td>Total non-live games run</td><td>{{ total_nonlive_games }}</td></tr>
+              <tr><td>Total winners awarded</td><td>{{ total_winners }}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</body>
+</html>
