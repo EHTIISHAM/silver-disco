@@ -690,8 +690,11 @@ async def scheduler():
             game_id = game["_id"]
             created_at = datetime.utcfromtimestamp(game["createdAt"] / 1000)
             timer_minutes = game["timerTillNextGame"]
-
-            start_time = created_at + timedelta(minutes=timer_minutes)
+            if timer_minutes is 0:
+                sec = 30
+            else:
+                sec = 0
+            start_time = created_at + timedelta(minutes=timer_minutes, seconds=sec)
 
 
             now = datetime.utcnow()
