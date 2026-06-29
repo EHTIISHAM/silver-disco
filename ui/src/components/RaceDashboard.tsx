@@ -45,10 +45,9 @@ interface RaceDashboardProps {
 }
 
 function getNextRaceStartTime(createdAt: number, timerTillNextRace?: number): string {
-  const minutes = timerTillNextRace || 0;
-  const startDate = new Date(createdAt + minutes * 60 * 1000);
+  const seconds = timerTillNextRace || 0;
+  const startDate = new Date(createdAt + seconds * 1000); // was * 60 * 1000
 
-  // Format HH:MM:SS to keep precision
   const hours = startDate.getHours().toString().padStart(2, "0");
   const mins = startDate.getMinutes().toString().padStart(2, "0");
   const secs = startDate.getSeconds().toString().padStart(2, "0");
@@ -56,15 +55,9 @@ function getNextRaceStartTime(createdAt: number, timerTillNextRace?: number): st
   return `${hours}:${mins}:${secs}`;
 }
 
-function getRemainingSeconds(starttimeofgame: string) {
-  const now = new Date();
-  const [hours, minutes, seconds = 0] = starttimeofgame.split(':').map(Number);
-  const startTime = new Date();
-  startTime.setHours(hours, minutes, seconds, 0);
-  const diffMs = startTime.getTime() - now.getTime();
-  return Math.max(0, Math.floor(diffMs / 1000));
+function getRemainingSeconds(raceStartMs: number) {
+  return Math.max(0, Math.floor((raceStartMs - Date.now()) / 1000));
 }
-
 interface Game {
   status: "Not Started" | "Ongoing" | "Finished";
   gameType: string;
@@ -98,7 +91,7 @@ const ProgressBar: React.FC<{ time: number; maxTime: number }> = ({ time, maxTim
 const RaceDashboard: React.FC<RaceDashboardProps> = ({ username }) => {
   const [showModal, setShowModal] = useState(false);
   const [recentRaces, setRecentRaces] = useState<any[]>([]);
-  const [filterMode, setFilterMode] = useState<'all' | 'me'>('all');
+  const [filterMode, setFilterMode] = useState<'all' | 'me'>('all');  
   const [games, setGames] = useState<Game[]>([]);
   const [remaining, setRemaining] = useState<number>(0);
   const currentGameType = games[0]?.gameType || "----";
@@ -115,6 +108,9 @@ const RaceDashboard: React.FC<RaceDashboardProps> = ({ username }) => {
   const isGameUnavailable = currentGameNumber === "----";
   const [timerData, setTimerData] = useState<number | null>(null);
   const [countdown, setCountdown] = useState<string>("--:--:--");
+  const raceStartMs = createdAt + (currentRaceTime || 0) * 1000;
+  const maxTimeSec = currentRaceTime || 0;
+
   // TODO: make it so that we can filter out user own data too
   // ✅ Fetch data from backend LeaderboardTemp
     useEffect(() => {
@@ -239,25 +235,22 @@ useEffect(() => {
 
   return () => clearInterval(interval);
 }, []);
-  useEffect(() => {
-    if (!games.length) return;
-    const startTime = getNextRaceStartTime(createdAt, currentRaceTime);
-    //const totalSeconds = (currentRaceTime || 0) * 60;
+useEffect(() => {
+  if (!games.length) return;
 
-    // Update remaining every second
-    const timer = setInterval(() => {
-      const remain = getRemainingSeconds(startTime);
-      setRemaining(remain);
+  setRemaining(getRemainingSeconds(raceStartMs));
 
-      // When timer ends, auto reload new game
-      if (remain <= 0) {
-        clearInterval(timer);
-        fetchGames();
-      }
-    }, 1000);
+  const timer = setInterval(() => {
+    const remain = getRemainingSeconds(raceStartMs);
+    setRemaining(remain);
+    if (remain <= 0) {
+      clearInterval(timer);
+      fetchGames();
+    }
+  }, 1000);
 
-    return () => clearInterval(timer);
-  }, [games, createdAt, currentRaceTime]);
+  return () => clearInterval(timer);
+}, [games, raceStartMs]);
 
 useEffect(() => {
   if (games?.[0]) {
@@ -293,8 +286,6 @@ useEffect(() => {
         <p>Loading next race...</p>
       </div>
     );
-
-  const maxTimeSec = (currentRaceTime || 0) * 60;
 
   return (
     <div className="w-full flex justify-center px-3 sm:px-6 lg:px-10 py-6">

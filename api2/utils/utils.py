@@ -41,6 +41,12 @@ async def fetch_games_from_db():
         games = [game for game in games if game.get("status") == "Not Started"]
         if not games:
             return {"games": []}
+        else:
+            if games[0]["timerTillNextGame"] == 0:
+                games[0]["timerTillNextGame"] = 30  # reset to 30 seconds if it's 0
+            else:
+                # convert it to seconds
+                games[0]["timerTillNextGame"] = int(games[0]["timerTillNextGame"] * 60)  # convert to seconds
 
         return {"games": games}
 
