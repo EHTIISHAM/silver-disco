@@ -1,0 +1,337 @@
+<!-- templates/championships.html -->
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Championships - Admin Dashboard</title>
+  <link rel="stylesheet" href="/static/css/styles.css" />
+  <style>
+    /* styles.css only covers text/email inputs and selects. */
+    input[type="number"], input[type="datetime-local"], textarea {
+      width: 100%; padding: 0.6rem; border: 1px solid #d1d5db; border-radius: 6px;
+      font-size: 0.95rem; font-family: inherit; box-sizing: border-box;
+    }
+    textarea { resize: vertical; min-height: 60px; }
+    .champ-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+    .stat-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 1rem; }
+    .stat-box .value { font-size: 1.5rem; font-weight: 700; color: #111827; }
+    .stat-box .label { font-size: 0.8rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
+    .pill { display: inline-block; padding: 0.15rem 0.6rem; border-radius: 999px;
+            font-size: 0.75rem; font-weight: 600; }
+    .pill-live { background: #dcfce7; color: #166534; }
+    .pill-queued { background: #e0e7ff; color: #3730a3; }
+    .pill-done { background: #f3f4f6; color: #4b5563; }
+    .pill-cancelled { background: #fee2e2; color: #991b1b; }
+    .order-btn { padding: 0.25rem 0.6rem; font-size: 0.9rem; line-height: 1; }
+    details.edit-panel { margin-top: 0.5rem; }
+    details.edit-panel summary { cursor: pointer; color: #4f46e5; font-size: 0.85rem; font-weight: 600; }
+    details.edit-panel > div { margin-top: 0.75rem; padding: 1rem; background: #f9fafb;
+                              border: 1px solid #e5e7eb; border-radius: 8px; }
+    .hint { color: #6b7280; font-size: 0.8rem; margin: 0.25rem 0 0; }
+    .empty { text-align: center; color: #6b7280; padding: 2rem; }
+    .inline-form { display: inline; }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="welcome-text">Welcome, {{ username }}</span>
+    <div class="header-nav">
+      <a href="/dashboard" class="nav-link">Dashboard</a>
+      <a href="/championships" class="nav-link active">Championships</a>
+      <a href="/past-winners" class="nav-link">Past Winners</a>
+      <a href="/nonlivegames" class="nav-link">Non Live Games</a>
+      <a href="/landing-settings" class="nav-link">Landing Settings</a>
+      <a href="/email-all" class="nav-link">Email All</a>
+      <a href="/analytics" class="nav-link">Analytics</a>
+    </div>
+    <div class="header-right">
+      <a href="/logout" class="logout-btn">Logout</a>
+    </div>
+  </header>
+
+  <main class="content-container">
+    <h1>Weekly Championships</h1>
+    <p class="hint">
+      Each championship owns one week: Monday 00:00 UTC to Sunday 23:59 UTC. When one
+      ends the next in the queue takes the following Monday automatically. With an empty
+      queue the site falls back to the all-time leaderboard.
+    </p>
+
+    <!-- ---------------------------------------------------------- RUNNING -->
+    <section>
+      <div class="flex-heading">
+        <h3>Currently Running</h3>
+        {% if active %}<span class="pill pill-live">LIVE</span>{% endif %}
+      </div>
+
+      <div class="card admin-card">
+        {% if active %}
+          <div class="flex-heading">
+            <h4 style="margin:0;">Week {{ active.weekNumber }} &mdash; {{ active.name }}</h4>
+            <span>{{ active.sponsor or "No sponsor" }}</span>
+          </div>
+
+          <div class="champ-grid" style="margin: 1rem 0;">
+            <div class="stat-box">
+              <div class="value">{{ active.remaining.days }}d {{ active.remaining.hours }}h {{ active.remaining.minutes }}m</div>
+              <div class="label">Time remaining</div>
+            </div>
+            <div class="stat-box">
+              <div class="value">{{ active.participants }}</div>
+              <div class="label">Participants</div>
+            </div>
+            <div class="stat-box">
+              <div class="value">{{ active.dailyBonusPoints }} / {{ active.dailyBonusRaces }}</div>
+              <div class="label">Bonus pts per races/day</div>
+            </div>
+            <div class="stat-box">
+              <div class="value" style="font-size:0.95rem;">{{ active.startPretty }}<br>{{ active.endPretty }}</div>
+              <div class="label">Start &rarr; end</div>
+            </div>
+          </div>
+
+          <form method="post" action="/api/admin/championships/end" class="inline-form">
+            <input type="hidden" name="championship_id" value="{{ active.id }}" />
+            <button type="submit" class="danger-btn"
+              onclick="return confirm('End this championship now? The current leader will be crowned and the results archived permanently.');">
+              End Now &amp; Crown Winner
+            </button>
+          </form>
+
+          <details class="edit-panel">
+            <summary>Edit branding &amp; bonus rules</summary>
+            <div>
+              <form method="post" action="/api/admin/championships/update">
+                <input type="hidden" name="championship_id" value="{{ active.id }}" />
+                <div class="form-group">
+                  <label>Name</label>
+                  <input type="text" name="name" value="{{ active.name }}" required />
+                </div>
+                <div class="form-group">
+                  <label>Sponsor</label>
+                  <input type="text" name="sponsor" value="{{ active.sponsor or '' }}" />
+                </div>
+                <div class="form-group">
+                  <label>Description</label>
+                  <textarea name="description">{{ active.description or '' }}</textarea>
+                </div>
+                <div class="form-group">
+                  <label>Races per day required for the daily bonus</label>
+                  <input type="number" name="dailyBonusRaces" min="1" value="{{ active.dailyBonusRaces or defaultBonusRaces }}" />
+                </div>
+                <div class="form-group">
+                  <label>Daily bonus points</label>
+                  <input type="number" name="dailyBonusPoints" min="0" value="{{ active.dailyBonusPoints or defaultBonusPoints }}" />
+                </div>
+                <p class="hint">The start and end dates of a running week cannot be changed.</p>
+                <button type="submit" class="save-btn">Save Changes</button>
+              </form>
+            </div>
+          </details>
+        {% else %}
+          <p class="empty">
+            No championship running &mdash; the site is serving the all-time leaderboard.
+            {% if queued %}The queue will start &ldquo;{{ queued[0].name }}&rdquo; {{ queued[0].eta }}.{% endif %}
+          </p>
+        {% endif %}
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------------------ QUEUE -->
+    <section>
+      <div class="flex-heading">
+        <h3>Queue</h3>
+        <span>{{ queued|length }} waiting</span>
+      </div>
+
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Name</th>
+              <th>Sponsor</th>
+              <th>Start mode</th>
+              <th>Expected start</th>
+              <th>Bonus</th>
+              <th>Order</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if queued %}
+              {% for c in queued %}
+                <tr>
+                  <td>{{ c.position }}</td>
+                  <td>
+                    <strong>{{ c.name }}</strong>
+                    <span class="pill pill-queued">QUEUED</span>
+                    <details class="edit-panel">
+                      <summary>Edit</summary>
+                      <div>
+                        <form method="post" action="/api/admin/championships/update">
+                          <input type="hidden" name="championship_id" value="{{ c.id }}" />
+                          <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" name="name" value="{{ c.name }}" required />
+                          </div>
+                          <div class="form-group">
+                            <label>Sponsor</label>
+                            <input type="text" name="sponsor" value="{{ c.sponsor or '' }}" />
+                          </div>
+                          <div class="form-group">
+                            <label>Description</label>
+                            <textarea name="description">{{ c.description or '' }}</textarea>
+                          </div>
+                          <div class="form-group">
+                            <label>Start mode</label>
+                            <select name="startMode">
+                              <option value="next_monday" {% if c.startMode == 'next_monday' %}selected{% endif %}>Next free Monday 00:00 UTC</option>
+                              <option value="immediate" {% if c.startMode == 'immediate' %}selected{% endif %}>Immediately (rest of this week)</option>
+                              <option value="scheduled" {% if c.startMode == 'scheduled' %}selected{% endif %}>Keep scheduled date</option>
+                            </select>
+                          </div>
+                          <div class="form-group">
+                            <label>Races per day for the daily bonus</label>
+                            <input type="number" name="dailyBonusRaces" min="1" value="{{ c.dailyBonusRaces or defaultBonusRaces }}" />
+                          </div>
+                          <div class="form-group">
+                            <label>Daily bonus points</label>
+                            <input type="number" name="dailyBonusPoints" min="0" value="{{ c.dailyBonusPoints or defaultBonusPoints }}" />
+                          </div>
+                          <button type="submit" class="save-btn">Save Changes</button>
+                        </form>
+                      </div>
+                    </details>
+                  </td>
+                  <td>{{ c.sponsor or "—" }}</td>
+                  <td>{{ c.startMode|replace("_", " ")|title }}</td>
+                  <td>{{ c.eta }}</td>
+                  <td>+{{ c.dailyBonusPoints or defaultBonusPoints }} / {{ c.dailyBonusRaces or defaultBonusRaces }} races</td>
+                  <td style="white-space: nowrap;">
+                    <form method="post" action="/api/admin/championships/reorder" class="inline-form">
+                      <input type="hidden" name="championship_id" value="{{ c.id }}" />
+                      <input type="hidden" name="direction" value="up" />
+                      <button type="submit" class="order-btn preview-btn"
+                        {% if loop.first %}disabled{% endif %} title="Move up">&uarr;</button>
+                    </form>
+                    <form method="post" action="/api/admin/championships/reorder" class="inline-form">
+                      <input type="hidden" name="championship_id" value="{{ c.id }}" />
+                      <input type="hidden" name="direction" value="down" />
+                      <button type="submit" class="order-btn preview-btn"
+                        {% if loop.last %}disabled{% endif %} title="Move down">&darr;</button>
+                    </form>
+                  </td>
+                  <td>
+                    <form method="post" action="/api/admin/championships/delete" class="inline-form">
+                      <input type="hidden" name="championship_id" value="{{ c.id }}" />
+                      <button type="submit" class="delete-btn"
+                        onclick="return confirm('Remove “{{ c.name }}” from the queue?');">Delete</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr><td colspan="8" class="empty">Queue is empty — nothing will start after the current championship ends.</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ----------------------------------------------------------- CREATE -->
+    <section>
+      <h3>Queue a New Championship</h3>
+      <div class="cards-row">
+        <div class="card admin-card">
+          <form method="post" action="/api/admin/championships/new">
+            <div class="form-group">
+              <label>Name</label>
+              <input type="text" name="name" placeholder="September Speed Championship" required />
+            </div>
+            <div class="form-group">
+              <label>Sponsor</label>
+              <input type="text" name="sponsor" placeholder="Sponsored by ..." />
+            </div>
+            <div class="form-group">
+              <label>Description</label>
+              <textarea name="description" placeholder="Optional blurb shown on the homepage widget"></textarea>
+            </div>
+            <div class="form-group">
+              <label>Start mode</label>
+              <select name="startMode">
+                <option value="next_monday">Next free Monday 00:00 UTC (default)</option>
+                <option value="immediate">Immediately — takes the rest of this week</option>
+                <option value="scheduled">On a specific date/time</option>
+              </select>
+              <p class="hint">
+                Queued championships run one after another in the order above. &ldquo;Next free Monday&rdquo;
+                skips any week that has already hosted a championship.
+              </p>
+            </div>
+            <div class="form-group">
+              <label>Scheduled start (UTC) &mdash; only used in scheduled mode</label>
+              <input type="datetime-local" name="scheduledStart" />
+            </div>
+            <div class="form-group">
+              <label>Races per day required for the daily bonus</label>
+              <input type="number" name="dailyBonusRaces" min="1" value="{{ defaultBonusRaces }}" />
+            </div>
+            <div class="form-group">
+              <label>Daily bonus points</label>
+              <input type="number" name="dailyBonusPoints" min="0" value="{{ defaultBonusPoints }}" />
+            </div>
+            <button type="submit" class="create-btn">ADD TO QUEUE</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------------------------------------------------------- ARCHIVE -->
+    <section>
+      <div class="flex-heading">
+        <h3>Hall of Champions</h3>
+        <span>Permanent archive</span>
+      </div>
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Week</th>
+              <th>Name</th>
+              <th>🥇 Champion</th>
+              <th>🥈 Second</th>
+              <th>🥉 Third</th>
+              <th>Winning score</th>
+              <th>Players</th>
+              <th>Ended</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if finished %}
+              {% for c in finished %}
+                <tr>
+                  <td>{{ c.weekNumber or "—" }}</td>
+                  <td>
+                    {{ c.name }}
+                    {% if c.status == 'cancelled' %}<span class="pill pill-cancelled">CANCELLED</span>
+                    {% else %}<span class="pill pill-done">{{ c.endReason|default('completed')|replace("_", " ") }}</span>{% endif %}
+                  </td>
+                  <td>{{ c.championUsername or "—" }}</td>
+                  <td>{{ c.secondPlaceUsername or "—" }}</td>
+                  <td>{{ c.thirdPlaceUsername or "—" }}</td>
+                  <td>{{ c.winningScore or 0 }}</td>
+                  <td>{{ c.participantCount or 0 }}</td>
+                  <td>{{ c.endPretty }}</td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr><td colspan="8" class="empty">No championships have finished yet</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

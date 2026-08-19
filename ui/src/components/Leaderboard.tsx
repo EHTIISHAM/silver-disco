@@ -1,17 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ChevronDown, Crown } from "lucide-react";
+import { ChevronDown, Trophy } from "lucide-react";
 
 import first from "../assets/1st.png";
 import second from "../assets/2nd.png";
 import third from "../assets/3rd.png";
-//import crown from "../assets/crown.png";
-import contact from "../assets/contact.png";
-import gift from "../assets/gift.png";
-import calendar from "../assets/calendar.png";
-import cup from "../assets/cup.png";
-import live from "../assets/live.png";
 
 interface Player {
   name: string;
@@ -20,40 +14,6 @@ interface Player {
   wins: number;
   points: number;
 }
-
-
-const competitionsData = {
-  current: {
-    title: "September Speed Championship",
-    sponsor: "Sponsored by Lorem Ipsum",
-    daysLeft: 12,
-    participants: 256,
-    liveRankings: 1234,
-  },
-  past: [
-    {
-      title: "August Thunder Cup",
-      date: "Aug 31, 2024",
-      winner: "SpeedDemon",
-      participants: 256,
-      prize: "$500 Gift card prize",
-    },
-    {
-      title: "Summer Slam Tournament",
-      date: "Jul 18, 2024",
-      winner: "BallMaster",
-      participants: 256,
-      prize: "$500 Gift card prize",
-    },
-    {
-      title: "Spring Sprint",
-      date: "Jun 3, 2024",
-      winner: "PinballPro",
-      participants: 256,
-      prize: "$500 Gift card prize",
-    },
-  ],
-};
 
 
 const Leaderboard: React.FC = () => {
@@ -274,110 +234,31 @@ useEffect(() => {
 
       {/* Competitions Tab */}
       {activeTab === "Competitions" && (
-        <div className="w-full max-w-2xl rounded-2xl space-y-6">
-          {/* Current Competition */}
-          <div className="relative rounded-2xl p-5 shadow-lg border border-purple-200 overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-[#271552]/80 to-black/40 blur-sm"></div>
+        <div className="w-full max-w-2xl rounded-2xl">
+          <div className="relative rounded-2xl p-8 shadow-lg border border-gray-800 overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-b from-[#271552]/60 to-black"></div>
 
-            <div className="relative z-10">
-              <h3 className="text-white font-bold text-2xl mb-1">
-                {competitionsData.current.title}
+            <div className="relative z-10 flex flex-col items-center text-center">
+              <div className="w-14 h-14 rounded-full bg-[#8b6fed]/15 border border-[#8b6fed]/30 flex items-center justify-center mb-4">
+                <Trophy size={26} className="text-[#8b6fed]" />
+              </div>
+
+              <h3 className="text-white font-bold text-xl mb-2">
+                Weekly Championship
               </h3>
-              <p className="text-gray-400 text-sm mb-4">
-                {competitionsData.current.sponsor}
+              <p className="text-gray-400 text-sm max-w-sm mb-6">
+                Every race you enter will earn points toward a weekly leaderboard
+                that resets each Monday. Champions get archived permanently.
               </p>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-[#1c1c22]/60 rounded-xl flex items-center space-x-3 p-4 backdrop-blur-sm">
-                  <img src={calendar} alt="calendar" className="w-5 h-5 object-contain" />
-                  <div>
-                    <p className="text-white font-semibold text-lg">
-                      {competitionsData.current.daysLeft} Days
-                    </p>
-                    <p className="text-gray-300 text-xs">Days left</p>
-                  </div>
-                </div>
+              <span className="text-xs uppercase tracking-wider text-[#8b6fed] bg-[#8b6fed]/10 border border-[#8b6fed]/30 px-4 py-1.5 rounded-full">
+                Coming soon
+              </span>
 
-                <div className="bg-[#1c1c22]/60 rounded-xl flex items-center space-x-3 p-4 backdrop-blur-sm">
-                  <img src={contact} alt="participants" className="w-5 h-5 object-contain" />
-                  <div>
-                    <p className="text-white font-semibold text-lg">
-                      {competitionsData.current.participants}
-                    </p>
-                    <p className="text-gray-300 text-xs">Participants</p>
-                  </div>
-                </div>
-
-                <div className="bg-[#1c1c22]/60 col-span-2 rounded-xl flex justify-between items-center p-4 backdrop-blur-sm">
-                  <div className="flex items-center space-x-3">
-                    <img src={cup} alt="cup" className="w-5 h-5 object-contain" />
-                    <div>
-                      <p className="text-white font-semibold text-lg">
-                        {competitionsData.current.liveRankings.toLocaleString()}
-                      </p>
-                      <p className="text-gray-300 text-xs">Live rankings</p>
-                    </div>
-                  </div>
-                  <img src={live} alt="Live" className="w-6 h-6 object-contain animate-pulse" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Past Competitions */}
-          <div className="bg-[#121212] py-10 px-6 rounded-2xl flex justify-center">
-            <div className="w-full rounded-2xl max-w-3xl">
-              <h3 className="text-white font-bold text-2xl mb-6 text-left">
-                Past Competitions
-              </h3>
-
-              <div className="space-y-6">
-                {competitionsData.past.map((comp, index) => (
-                  <div
-                    key={index}
-                    className="relative bg-[#1c1c22] p-6 rounded-2xl shadow-lg border border-gray-800 overflow-hidden"
-                  >
-                    <div className="absolute inset-0 bg-[#1f1f1f]"></div>
-
-                    <div className="relative z-10">
-                      <div className="flex justify-between items-center mb-4">
-                        <h4 className="text-white font-semibold text-lg">{comp.title}</h4>
-                        <span className="text-xs text-gray-400 bg-[#121212] px-3 py-1 rounded-full">
-                          {comp.date}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div className="bg-[#121212] p-4 rounded-xl flex items-center space-x-3 backdrop-blur-sm">
-                          <Crown className="text-white mb-1" size={22} />
-                          <div>
-                            <p className="text-white font-semibold">{comp.winner}</p>
-                            <p className="text-gray-400 text-xs">Winner</p>
-                          </div>
-                        </div>
-
-                        <div className="bg-[#121212] p-4 rounded-xl flex items-center space-x-3 backdrop-blur-sm">
-                          <img src={contact} alt="participants" className="w-5 h-5 object-contain" />
-                          <div>
-                            <p className="text-white font-semibold">
-                              {comp.participants}
-                            </p>
-                            <p className="text-gray-400 text-xs">Participants</p>
-                          </div>
-                        </div>
-
-                        <div className="col-span-2 bg-[#121212] p-4 rounded-xl flex items-center space-x-3 backdrop-blur-sm">
-                          <img src={gift} alt="prize" className="w-5 h-5 object-contain" />
-                          <div>
-                            <p className="text-white font-semibold">{comp.prize}</p>
-                            <p className="text-gray-400 text-xs">Gift card prize</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <p className="text-gray-500 text-xs mt-6">
+                Keep racing — points earned now still count toward your all-time
+                ranking on the All Races tab.
+              </p>
             </div>
           </div>
         </div>

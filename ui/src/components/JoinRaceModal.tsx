@@ -1,5 +1,6 @@
 import React, { useState,useEffect  } from "react";
 import { X } from "lucide-react";
+import { toast } from "react-toastify";
 
 import Ball1 from "../assets/balls/1.png";
 import Ball2 from "../assets/balls/2.png";
@@ -91,10 +92,10 @@ if (!res.ok) {
     }
       const result = await res.json();
       console.log("Joined successfully:", result);
-      alert("Successfully joined the race!");
+      toast.success(`You're in — ball ${selectedBall} for race ${gameNumber}`);
       onClose(); // Close modal after join
-    } catch (err) {
-        alert("Error Joining the Race")
+    } catch (err: any) {
+        toast.error(err?.message || "Error joining the race");
 }
   };
   return (
@@ -121,7 +122,7 @@ if (!res.ok) {
         <div className="p-4 bg-[#1f1f1f] flex items-center justify-between">
         {/* Left side */}
         <div className="flex flex-col">
-          <h3 className="text-white-400 text-sm mb-1">Game type</h3>
+          <h3 className="text-white text-sm mb-1">Game type</h3>
           <p className="text-gray-400 text-sm">Type chosen for your game is:</p>
         </div>
 
@@ -139,17 +140,16 @@ if (!res.ok) {
               <div
                 key={ball.id}
                 onClick={() => setSelectedBall(ball.id)}
-                className={`rounded-xl overflow-hidden cursor-pointer border-2 transition 
+                className={`rounded-xl overflow-hidden cursor-pointer border-2 transition transform hover:scale-105
                   ${selectedBall === ball.id
-                    ? "border-white-500"
-                    : "border-transparent"
+                    ? "border-indigo-500 shadow-lg shadow-indigo-500/20"
+                    : "border-transparent opacity-80 hover:opacity-100"
                   }`}
               >
                 <img
                     src={ball.img}
                     alt={`Ball ${ball.id}`}
-                    // Use the 16.5 classes for a precise match to 65.6px (66px)
-                    className="object-cover w-16.5 h-16.5 rounded-lg"
+                    className="object-cover w-16 h-16 rounded-lg"
                 />
               </div>
             ))}

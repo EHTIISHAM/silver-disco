@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { X, Play, SkipForward, Trophy, MapPin } from "lucide-react";
+import { toast } from "react-toastify";
 
 // Import images (keeping your existing imports)
 import Ball1 from "../assets/balls/1.png";
@@ -61,11 +62,10 @@ const JoinRaceModal: React.FC<JoinRaceModalProps> = ({ onClose }) => {
   const [videoCountdown, setVideoCountdown] = useState(30);
   const [canSkipVideo, setCanSkipVideo] = useState(false);
 
-  // Add this effect to handle the countdown
+  // Countdown only runs while the race video is actually on screen
   useEffect(() => {
-    // TIP: If you have a state that tracks the current step (e.g., currentStep === 'video'),
-    // wrap this logic in an `if` statement so it only counts down when the video is showing.
-    
+    if (step !== 'video') return;
+
     setVideoCountdown(30);
     setCanSkipVideo(false);
 
@@ -81,7 +81,7 @@ const JoinRaceModal: React.FC<JoinRaceModalProps> = ({ onClose }) => {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [/* add your step state variable here if needed */]);
+  }, [step]);
 
   // Helper to ensure autoplay is forced on the URL
   const getAutoplayUrl = (url: string) => {
@@ -143,7 +143,7 @@ const JoinRaceModal: React.FC<JoinRaceModalProps> = ({ onClose }) => {
       setStep('video'); 
       
     } catch (err: any) {
-      alert(err.message || "Error Joining the Race");
+      toast.error(err?.message || "Error joining the race");
     } finally {
       setLoading(false);
     }

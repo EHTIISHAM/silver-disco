@@ -39,6 +39,8 @@ from TikTokLive import TikTokLiveClient
 from utils.utils import router as utils_router
 from utils.lp import router as lp_router
 from utils.yolo_model import yolo_model
+import championship
+from championship import router as championship_router
 
 
 load_dotenv()
@@ -72,6 +74,7 @@ app.add_middleware(
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 app.include_router(utils_router)
 app.include_router(lp_router)
+app.include_router(championship_router)
 
 app.mount("/screenshots", StaticFiles(directory="screenshots"), name="screenshots")
 
@@ -356,14 +359,17 @@ async def process_off_game(game_id,user_id,ball_id):
     game = await db.games_off.find_one({"_id":ObjectId(game_id)})
     user = await db.users.find_one({"_id":ObjectId(user_id)})
     # fetch the rankings
-    user_points = POS_POINT[str(game["rankings"].get("ball_" + str(ball_id),"0"))]
+    # On-demand races score lower than live ones (10/5/3/1 vs 20/10/5/1), and a
+    # ball that finished outside the top 10 simply scores nothing.
+    rank = game.get("rankings", {}).get("ball_" + str(ball_id))
+    user_points = OFF_POS_POINT.get(str(rank), 0)
 
     parti_dict = {"userId": user_id,
                   "username": user["username"],
                   "createdAt": int(now.timestamp()),
                   "ball": str(ball_id),
                   "points": user_points,
-                  "rank": game["rankings"].get("ball_"+str(ball_id),"999")
+                  "rank": rank if rank is not None else "999"
                   }
     await db.games_off.update_one({"_id":ObjectId(game_id)},
                                   {"$addToSet": {"participants": parti_dict}})
@@ -379,22 +385,28 @@ async def process_off_game(game_id,user_id,ball_id):
             {"_id": user["_id"]},
             {"$set": {"total_points": new_points}}
         )
-    if game["rankings"].get("ball_" + str(ball_id),"0") in [1]:
+    if rank == 1:
         await db.users.update_one(
             {"_id": user["_id"]},
             {"$push": {"numberOfWins": {"wins": 1, "timestamp": int(datetime.utcnow().timestamp())}}}
         )
-        if game["rankings"].get("ball_" + str(ball_id),"0") == 1:
-            new_streak = user.get("winningStreak", 0) + 1
-            await db.users.update_one(
-                {"_id": user["_id"]},
-                {"$set": {"winningStreak": new_streak}}
-            )
+        new_streak = user.get("winningStreak", 0) + 1
+        await db.users.update_one(
+            {"_id": user["_id"]},
+            {"$set": {"winningStreak": new_streak}}
+        )
     await db.users.update_one(
         {"_id": user["_id"]},
         {"$push": {"racesPlayed": {"races": 1,"raceId": "offline", "user_ball": str(ball_id), "timestamp": int(datetime.utcnow().timestamp())}}}
     )
-    return str(game["rankings"].get("ball_" + str(ball_id),"0")),user_points
+    # Feed the weekly championship, streak and career counters.
+    try:
+        await championship.record_race_result(
+            user, rank if isinstance(rank, int) else None, user_points, game_type="offline"
+        )
+    except Exception as e:
+        print(f"⚠️ championship hook failed for {user.get('username')}: {e}")
+    return (str(rank) if rank is not None else "10+"), user_points
 # it will receive credentials and return a random offline game url
 @app.post("/api/games/offline/url")
 async def get_offline_game_url(
@@ -435,9 +447,8 @@ async def get_offline_game_url(
     offline_game = await cursor.to_list(length=1)
     if not offline_game:
         raise HTTPException(status_code=404, detail="No offline game available")
+    # process_off_game already reports "10+" for a ball that did not place.
     ranks, points = await process_off_game(offline_game[0]["_id"],game_data.userId,game_data.ball_id)
-    if ranks == None:
-        ranks = "10+"
     secure_link = create_secure_video_link(offline_game[0]["video_url"], game_data.userId)
     return {"video_link": secure_link,
             "user_ball":"ball_"+ str(game_data.ball_id),
@@ -1213,6 +1224,32 @@ async def analytics_page(request: Request, period: str = "all"):
     total_live_games    = await db.games.count_documents({})
     total_nonlive_games = await db.games_off.count_documents({})
     total_winners       = await db.games.count_documents({"winners": {"$exists": True, "$not": {"$size": 0}}})
+    # the very recently played live game id is the one with the latest createdAt timestamp
+    very_recent_live_game_id = await db.games.find_one({}, sort=[("createdAt", -1)], projection={"_id": 1})
+
+    total_users_list         = await db.users.find({}).to_list(length=None)
+    for i, user in enumerate(total_users_list):
+        if user["createdAt"] >= int((now - timedelta(hours=30)).timestamp() * 1000):
+            total_users_list[i]["recent_signup"] = True
+        else:
+            total_users_list[i]["recent_signup"] = False
+        total_live_games_played = 0
+        total_nonlive_games_played = 0
+        for game in user.get("racesPlayed", []):
+            if game.get("raceId") != "offline":
+                total_live_games_played += 1
+                # match the game id with the very_recent_live_game_id to mark recent live game played
+                if very_recent_live_game_id and game.get("raceId") == str(very_recent_live_game_id["_id"]):
+                    total_users_list[i]["recent_live_game_played"] = True
+            else:
+                total_nonlive_games_played += 1
+                
+        total_users_list[i]["createdAt_formatted"] = format_timestamp(user["createdAt"])
+        total_users_list[i]["total_live_games_played"] = total_live_games_played
+        total_users_list[i]["total_nonlive_games_played"] = total_nonlive_games_played
+        # if the recent_live_game_played is not set, set it to False
+        if "recent_live_game_played" not in total_users_list[i]:
+            total_users_list[i]["recent_live_game_played"] = False
 
     live_players    = await db.users.count_documents({"racesPlayed": {"$elemMatch": {"raceId": {"$ne": "offline"}}}})
     nonlive_players = await db.users.count_documents({"racesPlayed": {"$elemMatch": {"raceId": "offline"}}})
@@ -1238,6 +1275,7 @@ async def analytics_page(request: Request, period: str = "all"):
         "total_live_games": total_live_games,
         "total_nonlive_games": total_nonlive_games,
         "total_winners": total_winners,
+        "total_users_list": total_users_list
     })
 
 
@@ -1718,6 +1756,18 @@ async def leaderboard_new(timeline: str):
         "refreshing": False, # It's never refreshing in background anymore
         "data": cached_entry.get("data", [])
     }
+
+async def _leaderboard_data_for(timeline: str):
+    """
+    Adapter handed to championship.py so /api/leaderboard/active can fall back
+    to this all-time leaderboard whenever no championship is running.
+    """
+    start_ts, end_ts = get_time_range(timeline)
+    timeline_key = timeline.lower().replace(" ", "_")
+    if cache_expired(timeline_key):
+        await compute_leaderboard(start_ts, end_ts, timeline_key)
+    return LEADERBOARD_CACHE.get(timeline_key, {}).get("data", [])
+
 def get_participant_by_ball(participants: List[Dict], ball_num: str):
     """Finds a participant dict (username, etc.) given a ball number."""
     for p in participants:
@@ -2117,6 +2167,14 @@ async def submit_rankings(rankings: Dict[str, int]):
                             {"_id": user["_id"]},
                             {"$push": {"racesPlayed": {"races": 1,"raceId": current_game["_id"], "user_ball": participant.get("ball"), "timestamp": int(datetime.utcnow().timestamp())}}}
                         )
+                        # Feed the weekly championship, streak and career counters.
+                        try:
+                            await championship.record_race_result(
+                                user, position, points, game_type="live"
+                            )
+                        except Exception as e:
+                            # A championship failure must never lose a race result.
+                            print(f"⚠️ championship hook failed for {user.get('username')}: {e}")
         await leaderboard_entry(current_game, rankings)
         # mark current game as Finished
         # add endedAt time no need to update status as Finished will be handled by the scheduler
@@ -2189,6 +2247,11 @@ async def download_database(
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(scheduler())
+    # Championship rollover runs as its own task: scheduler() above sleeps for
+    # the full countdown of the next game, which would delay the Monday 00:00
+    # UTC rollover by up to that long.
+    championship.set_fallback_leaderboard(_leaderboard_data_for)
+    asyncio.create_task(championship.championship_scheduler())
     env_admin = os.getenv("ADMIN_USERNAME")
     env_pass = os.getenv("ADMIN_PASSWORD")
     env_hash = os.getenv("ADMIN_PASSWORD_HASH")

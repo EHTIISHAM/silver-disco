@@ -292,7 +292,7 @@ useEffect(() => {
       <div className="w-full max-w-6xl text-white grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="bg-[#121212] rounded-2xl p-4 shadow border border-gray-800 flex flex-col justify-between">
   <div>
-    <h2 className="text-sm text-white-600 mb-1">
+    <h2 className="text-sm text-white mb-1">
       Next Live race{" "}
       <span className="text-indigo-400">
         {currentGameType === "----" ? countdown : `(${currentGameType})`}
@@ -463,7 +463,7 @@ useEffect(() => {
   </div>
   
   {/* Added ml-2 and flex-shrink-0 so the arrow always stays glued to the right edge and remains visible */}
-  <span className="text-white-400 text-lg ml-2 flex-shrink-0">&gt;</span>
+  <span className="text-gray-400 text-lg ml-2 flex-shrink-0">&gt;</span>
 </div>
             ))
           )}

@@ -6,6 +6,7 @@ import LoginDemo from "./pages/login/Logincopy";
 import Login from "./pages/login/Login";
 import SignUp from "./pages/signUp/SignUp";
 import Home from "./pages/home/Home";
+import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import ErrorPage from "./ErrorPage";
 import View from "./pages/home/sections/View";
@@ -117,7 +118,17 @@ const router = createBrowserRouter([
 ]);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
-  <RouterProvider router={router} />
+  <>
+    <RouterProvider router={router} />
+    <ToastContainer
+      position="top-center"
+      autoClose={3000}
+      theme="dark"
+      newestOnTop
+      closeOnClick
+      pauseOnFocusLoss={false}
+    />
+  </>
 );
 
 

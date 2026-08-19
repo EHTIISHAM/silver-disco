@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from "react";
 import demo from "../assets/demo.mp4";
-import JoinRaceModal from "../components/JoinRaceModaloffline"; // Added your import
 
 const LiveStreamCard: React.FC = () => {
   const [isLive, setIsLive] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
-  const [isRaceModalOpen, setIsRaceModalOpen] = useState(false); // Added modal state
 
   const serverUrl = import.meta.env.VITE_PY_SERVER_URL || "http://localhost:3000";
 
@@ -81,25 +79,8 @@ const LiveStreamCard: React.FC = () => {
               title="Watch live on TikTok"
             />
           )}
-
-          {/* Floating Action Button inside the video container */}
-          <div className="absolute bottom-6 left-0 right-0 flex justify-center z-30 pointer-events-none">
-            <button
-              onClick={() => setIsRaceModalOpen(true)}
-              className="pointer-events-auto bg-purple-600 hover:bg-purple-500 text-white font-bold py-2.5 px-6 rounded-full shadow-[0_0_15px_rgba(147,51,234,0.5)] transition-all transform hover:scale-105"
-            >
-              Play On-Demand Race
-            </button>
-          </div>
         </div>
       </div>
-
-      {/* Render Modal Outside the Card Container */}
-      {isRaceModalOpen && (
-        <JoinRaceModal 
-          onClose={() => setIsRaceModalOpen(false)}
-        />
-      )}
     </>
   );
 };

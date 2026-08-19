@@ -27,6 +27,7 @@
     <span class="welcome-text">Welcome, {{ username }}</span>
     <div class="header-nav">
       <a href="/dashboard" class="nav-link">Dashboard</a>
+      <a href="/championships" class="nav-link">Championships</a>
       <a href="/past-winners" class="nav-link">Past Winners</a>
       <a href="/nonlivegames" class="nav-link">Non Live Games</a>
       <a href="/landing-settings" class="nav-link">Landing Settings</a>
@@ -127,6 +128,32 @@
         </div>
       </section>
 
+    </div>
+    <!-- making a list of signups and if recent then add a blue color new tag with it adding total played live games and non live games -->
+    <div>
+      <h3>Recent Signups</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Email</th>
+            <th>Signup Time</th>
+            <th>Live Games Played</th>
+            <th>Non-Live Games Played</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for user in total_users_list %}
+          <tr>
+            <td>{{ user.username }} {% if user.recent_signup %} <span style="color:blue; font-weight:bold;">(New)</span>{% endif %}</td>
+            <td>{{ user.email }}</td>
+            <td>{{ user.createdAt_formatted }}</td>
+            <td>{{ user.total_live_games_played }} {% if user.recent_live_game_played %} <span style="color:green; font-weight:bold;">(Recent)</span>{% endif %}</td>
+            <td>{{ user.total_nonlive_games_played }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </main>
 </body>
